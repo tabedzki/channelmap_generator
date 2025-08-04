@@ -1052,7 +1052,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
         )
 
         # IMRO file dropper
-        self.imro_file_loader = pn.widgets.FileInput(width = 300)
+        self.imro_file_loader = pn.widgets.FileInput(accept=".imro", width = 300)
         self.apply_uploaded_imro_button = pn.widgets.Button(
             name="Apply uploaded IMRO file to selection ⬆",
             button_type="primary",
