@@ -1,6 +1,6 @@
 services:
   channelmap-generator:
-    image: ghcr.io/m-beau/channelmap_generator
+    image: ghcr.io/m-beau/channelmap_generator@latest
     container_name: channelmap-generator
     pull_policy: always
     env_file:
