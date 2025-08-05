@@ -1237,16 +1237,15 @@ def create_app():
     return layout
 
 
-def main():
-    print(GUI_ASSETS_DIR)
+def main(show=False):
 
     # Create app
     app = create_app()
     
     # Serve the app
     port = find_free_port(5008)
-    pn.serve(app, port=port, show=True, title="Neuropixels Channelmap Generator (Bokeh)")
+    pn.serve(app, port=port, show=show, title="Neuropixels Channelmap Generator")
 
 if __name__ == "__main__":
-    main()
+    main(show=True) # when run locally, makes the app pop up in the browser
     
