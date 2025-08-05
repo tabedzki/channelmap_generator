@@ -28,18 +28,18 @@ RUN --mount=type=cache,target=/root/.cache/uv uv sync --no-dev --frozen
 ENV PATH="/app/.venv/bin:$PATH"
 
 # Expose the port
-ENV CMAP_GUI_PORT=5008
+ENV INTERNAL_PORT=5008
 ENV NUM_PROCS=2
 ENV NUM_THREADS=0
-EXPOSE ${CMAP_GUI_PORT}
+EXPOSE ${INTERNAL_PORT}
 
 # Copy the Dockerfile to /dockerfile within the container
 COPY Dockerfile /Dockerfile
 
 
 # Health check
-HEALTHCHECK CMD curl --fail http://localhost:${CMAP_GUI_PORT}/
+HEALTHCHECK CMD curl --fail http://localhost:${INTERNAL_PORT}/
 
 # Run the Panel app
-CMD ["sh", "-c", "uv run panel serve /app/app.py --address 0.0.0.0 --port $CMAP_GUI_PORT --allow-websocket-origin '*' --num-procs $NUM_PROCS --num-threads $NUM_THREADS --index app"]
+CMD ["sh", "-c", "uv run panel serve /app/app.py --address 0.0.0.0 --port $INTERNAL_PORT --allow-websocket-origin '*' --num-procs $NUM_PROCS --num-threads $NUM_THREADS --index app --show"]
 

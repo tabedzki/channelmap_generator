@@ -4,16 +4,16 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "${EXTERNAL_PORT}:${CMAP_GUI_PORT}"
+      - "${EXTERNAL_PORT}:${INTERNAL_PORT}"
     environment:
-      - CMAP_GUI_PORT=${CMAP_GUI_PORT:-5008}
-      - EXTERNAL_PORT=${EXTERNAL_PORT:-5009}
+      - INTERNAL_PORT=${INTERNAL_PORT:-5008}
+      - EXTERNAL_PORT=${EXTERNAL_PORT:-5008}
       - NUM_PROCS=2
       - NUM_THREADS=0
     volumes:
       - ./output:/app/output
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:${CMAP_GUI_PORT}/"]
+      test: ["CMD", "curl", "--fail", "http://localhost:${INTERNAL_PORT}/"]
       interval: 30s
       timeout: 10s
       retries: 3
