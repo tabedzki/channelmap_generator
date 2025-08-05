@@ -1,12 +1,12 @@
 services:
   channelmap-generator:
-    image: ghcr.io/m-beau/channelmap_generator@latest
+    image: ghcr.io/m-beau/channelmap_generator:latest
     container_name: channelmap-generator
     pull_policy: always
-    env_file:
-      - .env
     ports:
-      - "${EXTERNAL_PORT}:${INTERNAL_PORT}"
+      - "5008:5008"
+    environment:
+      - INTERNAL_PORT=5008 #This number should reflect the port after the `:` above
     volumes:
       - ./output:/app/output
     healthcheck:

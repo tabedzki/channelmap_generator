@@ -2,15 +2,20 @@
 
 ⚡ Generate channel maps for Neuropixels probes that respect electrode-ADC wiring constraints! ⚡
 
+
 ## Installation
 
-Clone the repository and enter it:
+Clone the repository and navigate to it:
+
 ```bash
 git clone http://github.com/m-beau/channelmap_generator.git
 cd channelmap_generator
 ```
 
-Pip install the package e.g. in a new conda environment:
+### Install the package using pip
+
+For example, in a new conda environment:
+
 ```bash
 conda create -n my_environment python=3.12
 conda activate my_environment
@@ -19,43 +24,53 @@ uv pip install . # fast! run pip install uv first.
 pip install .
 ```
 
-### Quick Docker Run
+### Using `uv` (Recommended)
 
-Alternatively, you can download the latest stable Docker image via
+With `uv`, you can either install dependencies first and then run the application, or run it directly in one command:
+
+Install dependencies, then run:
 
 ```bash
-# Simple run (uses latest image)
-docker run --rm --name channelmap-app -p 5008:5008 ghcr.io/m-beau/channelmap_generator:latest
+uv sync
+uv run cmap_gui
+```
 
-# Always checks for a newer version
+Or run directly (installs dependencies automatically):
+
+```bash
+uv run cmap_gui  # This will automatically install dependencies if needed
+```
+
+The second approach is particularly convenient as `uv` will automatically create a virtual environment, install all dependencies from `pyproject.toml`, and run the GUI in a single command.
+
+### Run using Docker (Installation-free)
+
+Run the latest stable Docker image directly without any local installation. The application will be available at http://localhost:5008.
+
+```bash
 docker run --rm --name channelmap-app -p 5008:5008 --pull=always ghcr.io/m-beau/channelmap_generator:latest
 ```
 
-### Docker Compose (Recommended)
+#### Docker Compose
 
-```bash
-# Download compose file
-curl -O https://raw.githubusercontent.com/m-beau/channelmap_generator/main/compose.yml
-curl -O https://raw.githubusercontent.com/m-beau/channelmap_generator/main/env.template
-cp env.template .env
-
-# Start the application
-docker compose up -d
-```
+For a more robust deployment, use Docker Compose. See the included `docker-compose.yml` for configuration details:
 
 ## Usage
 
 ### 1. Browser-based GUI
 
-Launch the interactive GUI - from the repository directory:
+Launch the interactive GUI from the repository directory using one of these methods:
+
+**If you installed with pip:**
 
 ```bash
-cmap_gui # alias for python ./channelmap_generator/gui/gui.py
+cmap_gui  # Alias for: python ./channelmap_generator/gui/gui.py
 ```
 
-If you have `uv`, this will automatically install the virtual environments and run the app.
+**If you're using uv (recommended):**
+
 ```bash
-uv run cmap_gui
+uv run cmap_gui  # Automatically manages dependencies and virtual environment
 ```
 
 Neuropixels electrodes are [hardwired](https://www.neuropixels.org/support) to specific ADCs in the probe's head. When you select an electrode, others become unavailable because they share the same recording lines. This GUI allows you to build a channelmap around those constraints: when you select channels, they turn **red**, and those that become unavailable because they share the same lines turn **black**.
@@ -73,7 +88,7 @@ Once you reach the **target number of electrodes** for the selected probe type (
 
 ![](channelmap_generator/gui/assets/GUI_screenshot.png)
 
-### 2. Python API / Jupyter notebook
+### 2. Python API / Jupyter Notebook
 
 Check out the code in `generate_channel_maps.ipynb` to reproducibly create custom channel maps. The notebook provides examples for all supported probe types and presets.
 
