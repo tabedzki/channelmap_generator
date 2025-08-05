@@ -1,0 +1,21 @@
+services:
+  channelmap-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${EXTERNAL_PORT}:${CMAP_GUI_PORT}"
+    environment:
+      - CMAP_GUI_PORT=${CMAP_GUI_PORT:-5008}
+      - EXTERNAL_PORT=${EXTERNAL_PORT:-5009}
+      - NUM_PROCS=2
+      - NUM_THREADS=0
+    volumes:
+      - ./output:/app/output
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:${CMAP_GUI_PORT}/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
