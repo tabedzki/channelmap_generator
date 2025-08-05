@@ -19,6 +19,30 @@ uv pip install . # fast! run pip install uv first.
 pip install .
 ```
 
+### Quick Docker Run
+
+Alternatively, you can download the latest stable Docker image via
+
+```bash
+# Simple run (uses latest image)
+docker run --rm --name channelmap-app -p 5008:5008 ghcr.io/m-beau/channelmap_generator:latest
+
+# Always checks for a newer version
+docker run --rm --name channelmap-app -p 5008:5008 --pull=always ghcr.io/m-beau/channelmap_generator:latest
+```
+
+### Docker Compose (Recommended)
+
+```bash
+# Download compose file
+curl -O https://raw.githubusercontent.com/m-beau/channelmap_generator/main/compose.yml
+curl -O https://raw.githubusercontent.com/m-beau/channelmap_generator/main/env.template
+cp env.template .env
+
+# Start the application
+docker compose up -d
+```
+
 ## Usage
 
 ### 1. Browser-based GUI
@@ -27,6 +51,11 @@ Launch the interactive GUI - from the repository directory:
 
 ```bash
 cmap_gui # alias for python ./channelmap_generator/gui/gui.py
+```
+
+If you have `uv`, this will automatically install the virtual environments and run the app.
+```bash
+uv run cmap_gui
 ```
 
 Neuropixels electrodes are [hardwired](https://www.neuropixels.org/support) to specific ADCs in the probe's head. When you select an electrode, others become unavailable because they share the same recording lines. This GUI allows you to build a channelmap around those constraints: when you select channels, they turn **red**, and those that become unavailable because they share the same lines turn **black**.

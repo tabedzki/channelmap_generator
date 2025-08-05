@@ -1,8 +1,9 @@
 services:
   channelmap-generator:
-    image: ghcr.io/m-beau/channelmap_generator
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: channelmap-generator
-    pull_policy: always
     env_file:
       - .env
     ports:
