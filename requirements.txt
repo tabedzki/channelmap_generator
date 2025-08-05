@@ -3,3 +3,4 @@ matplotlib>=3.7.0
 numpy>=1.24.0
 pandas>=2.0.0
 param>=1.13.0
+bokeh>=3.0.0

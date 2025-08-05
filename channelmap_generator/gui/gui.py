@@ -90,7 +90,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
         self.selected_electrodes = set()  # Set of (shank_id, electrode_id) tuples
         self.forbidden_electrodes = set()  # Set of (shank_id, electrode_id) tuples
         self.probe_plot_height = 2500
-        self.probe_plot_width = 1000
+        self.probe_plot_width = 800
         self.ap_gain_default = 500
         self.lf_gain_default = 250
         
@@ -1214,7 +1214,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
 
 ## App creation utilities
 
-def find_free_port(start_port=5008):
+def find_free_port(start_port=5007):
     """Find next available port starting from start_port"""
     for port in range(start_port, start_port + 100):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -1237,13 +1237,13 @@ def create_app():
     return layout
 
 
-def main(show=False):
+def main(show=True):
 
     # Create app
     app = create_app()
     
     # Serve the app
-    port = find_free_port(5008)
+    port = find_free_port(5007)
     pn.serve(app, port=port, show=show, title="Neuropixels Channelmap Generator")
 
 if __name__ == "__main__":
