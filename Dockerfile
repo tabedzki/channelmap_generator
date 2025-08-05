@@ -33,13 +33,16 @@ ENV NUM_PROCS=2
 ENV NUM_THREADS=0
 EXPOSE ${INTERNAL_PORT}
 
+# Copy the entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Copy the Dockerfile to /dockerfile within the container
 COPY Dockerfile /Dockerfile
-
 
 # Health check
 HEALTHCHECK CMD curl --fail http://localhost:${INTERNAL_PORT}/
 
-# Run the Panel app
-CMD ["sh", "-c", "uv run panel serve /app/app.py --address 0.0.0.0 --port $INTERNAL_PORT --allow-websocket-origin '*' --num-procs $NUM_PROCS --num-threads $NUM_THREADS --index app --show"]
+# Set the entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
 
