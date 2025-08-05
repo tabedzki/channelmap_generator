@@ -1066,6 +1066,10 @@ class ChannelmapGUIBokeh(param.Parameterized):
 
         # Controls panel (fixed on left)
         controls = pn.Column(
+            pn.pane.Markdown(("<div style='text-align: center; padding: 12px;'><strong>See project at:"
+                             "<br><a href='https://github.com/m-beau/channelmap_generator' "
+                             "target='_blank'>github.com/m-beau/channelmap_generator</a></strong></div>"),
+                             margin=(0, 0, -10, 40)),
             # Prominent electrode counter at top
             self.electrode_counter,
             self.clear_button,
