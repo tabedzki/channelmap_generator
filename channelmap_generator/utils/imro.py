@@ -1,0 +1,171 @@
+################################
+## IMRO file I/O utilities ##
+################################
+
+
+import numpy as np
+
+from channelmap_generator.constants import PROBE_TYPE_MAP, REF_ELECTRODES
+
+
+def save_to_imro_file(imro_list, filename="channelmap.imro"):
+    """
+    Save IMRO list to a text file in SpikeGLX format.
+
+    Args:
+        imro_list: List of tuples from generate_imro_channelmap
+        filename: Output filename (default: "channelmap.imro")
+    """
+    if ".imro" not in filename:
+        filename = filename + ".imro"
+    filename = "_".join(filename.replace("\n", " ").split(" "))
+
+    with open(filename, "w") as f:
+        # Write header
+        header = imro_list[0]
+        f.write(f"({header[0]},{header[1]})")
+
+        # Write channel entries
+        for entry in imro_list[1:]:
+            # Format tuple as space-separated values in parentheses
+            entry_str = " ".join(str(x) for x in entry)
+            f.write(f"({entry_str})")
+
+        # Add newline at end of file
+        f.write("\n")
+
+    print(f"IMRO file saved: {filename}")
+
+
+def parse_imro_file(content):
+    """
+    Parse IMRO file content and return imro_list format.
+
+    Args:
+        content: str, contents of .imro file
+
+    Returns:
+        imro_list: List of tuples matching generate_imro_channelmap output
+    """
+    # Split by ')(' to get individual entries
+    entries = content.split(")(")
+
+    # Clean up parentheses from first and last entries
+    entries[0] = entries[0].lstrip("(")
+    entries[-1] = entries[-1].rstrip(")")
+
+    # Parse header (first entry: "24,384")
+    header_parts = entries[0].split(",")
+    header = (int(header_parts[0]), int(header_parts[1]))
+
+    # Parse channel entries (format: "0 1 0 2 288")
+    channel_entries = []
+    for entry_str in entries[1:]:
+        values = [int(x) for x in entry_str.split()]
+        channel_entries.append(tuple(values))
+
+    return [header] + channel_entries
+
+
+def read_imro_file(filepath):
+    """
+    Read IMRO file and return imro_list format.
+
+    Args:
+        filepath: Path to .imro file
+
+    Returns:
+        imro_list: List of tuples matching generate_imro_channelmap output
+    """
+    with open(filepath, "r") as f:
+        content = f.read().strip()
+
+    return parse_imro_file(content)
+
+
+def parse_imro_list(imro_list):
+    """
+    Parse imro_list to extract electrode selection and parameters.
+
+    Args:
+        imro_list: List from read_imro_file or generate_imro_channelmap
+
+    Returns:
+        tuple: (selected_electrodes, probe_type, probe_subtype, reference_id, ap_gain, lf_gain, hp_filter)
+               selected_electrodes: numpy array of (shank_id, electrode_id) pairs
+               probe_type: "1.0", "2.0-1shank", "2.0-4shanks", or "NXT"
+               Other parameters: as used in original generation
+    """
+    header = imro_list[0]
+    probe_subtype = header[0]
+    entries = imro_list[1:]
+
+    # Determine probe type from subtype
+    if probe_subtype in PROBE_TYPE_MAP["1.0"]:
+        probe_type = "1.0"
+    elif probe_subtype in PROBE_TYPE_MAP["2.0-1shank"]:
+        probe_type = "2.0-1shank"
+    elif probe_subtype in PROBE_TYPE_MAP["2.0-4shanks"]:
+        probe_type = "2.0-4shanks"
+    elif probe_subtype in PROBE_TYPE_MAP["NXT"]:
+        probe_type = "NXT"
+
+    selected_electrodes = []
+
+    if probe_type == "1.0":
+        # Format: (channel, bank, ref, ap_gain, lf_gain, hp_filter)
+        reference_id = entries[0][2]  # Same for all entries
+        ap_gain = entries[0][3]
+        lf_gain = entries[0][4]
+        hp_filter = entries[0][5]
+
+        # Convert reference value back to string
+        ref_map = {v: k for k, v in REF_ELECTRODES[probe_subtype].items()}
+        reference_id = ref_map[reference_id]
+
+        # Extract electrodes: channel + 384*bank gives electrode_id, shank is always 0
+        for entry in entries:
+            channel, bank = entry[0], entry[1]
+            electrode_id = channel + 384 * bank
+            selected_electrodes.append([0, electrode_id])
+
+    elif probe_type == "2.0-1shank":
+        # Format: (channel, bank_mask, ref, electrode_id)
+        reference_id = entries[0][2]
+        ap_gain = lf_gain = hp_filter = None  # Not used in 2.0
+
+        # Convert reference value back to string
+        ref_map = {v: k for k, v in REF_ELECTRODES[probe_subtype].items()}
+        reference_id = ref_map[reference_id]
+
+        # Extract electrodes: electrode_id is directly stored, shank is always 0
+        for entry in entries:
+            electrode_id = entry[3]
+            selected_electrodes.append([0, electrode_id])
+
+    else:  # 2.0-4shanks or NXT
+        # Format: (channel, shank_id, bank, ref, electrode_id)
+        reference_id = entries[0][3]
+        ap_gain = lf_gain = hp_filter = None  # Not used in 2.0
+
+        # Convert reference value back to string
+        ref_electrodes = REF_ELECTRODES[probe_subtype]
+        if "tip" in ref_electrodes and isinstance(ref_electrodes["tip"], list):
+            if reference_id in ref_electrodes["tip"]:
+                reference_id = "tip"
+            else:
+                ref_map = {v: k for k, v in ref_electrodes.items() if k != "tip"}
+                reference_id = ref_map[reference_id]
+        else:
+            ref_map = {v: k for k, v in ref_electrodes.items()}
+            reference_id = ref_map[reference_id]
+
+        # Extract electrodes: shank_id and electrode_id are directly stored
+        for entry in entries:
+            shank_id = entry[1]
+            electrode_id = entry[4]
+            selected_electrodes.append([shank_id, electrode_id])
+
+    selected_electrodes = np.array(selected_electrodes, dtype=int)
+
+    return selected_electrodes, probe_type, probe_subtype, reference_id, ap_gain, lf_gain, hp_filter

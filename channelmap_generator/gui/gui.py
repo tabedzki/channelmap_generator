@@ -29,6 +29,8 @@ from bokeh.models import (
 )
 from bokeh.plotting import figure
 
+import channelmap_generator.utils.imro as imro_io
+
 # Handle imports that work both as script and as package module
 try:
     # Try relative import (works when run as module: python -m channelmap_generator.gui.gui)
@@ -772,17 +774,16 @@ class ChannelmapGUIBokeh(param.Parameterized):
         # imro_file_content = list(self.imro_file_loader.value.values())[0] # for FileDropper() widget
         imro_file_content = self.imro_file_loader.value
         if isinstance(imro_file_content, bytes):
-            imro_file_content = imro_file_content.decode("utf-8")
-        imro_list = backend.parse_imro_file(imro_file_content.strip())
-        (
-            selected_electrodes,
-            self.probe_type,  # probe_type value is a monitored param - simply setting its value will update the plot
-            self.probe_subtype,
-            self.reference_id,
-            self.ap_gain_input.value,
-            self.lf_gain_input.value,
-            self.hardware_hp_filter_on,
-        ) = backend.parse_imro_list(imro_list)
+            imro_file_content = imro_file_content.decode('utf-8')
+        imro_list = imro_io.parse_imro_file(imro_file_content.strip())
+        (selected_electrodes,
+        self.probe_type, # probe_type value is a monitored param - simply setting its value will update the plot
+        self.probe_subtype,
+        self.reference_id,
+        self.ap_gain_input.value,
+        self.lf_gain_input.value,
+        self.hardware_hp_filter_on,
+        ) = imro_io.parse_imro_list(imro_list)
 
         self.selected_electrodes = set(map(tuple, selected_electrodes))
         self.update_forbidden_electrodes()
