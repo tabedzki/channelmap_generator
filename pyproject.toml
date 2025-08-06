@@ -53,3 +53,8 @@ channelmap_generator = [
     "gui/*.svg",
     "example_layouts/*.pdf",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+]
