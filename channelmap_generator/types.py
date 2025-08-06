@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Self
 
 import numpy as np
 
@@ -17,7 +18,7 @@ class ProbeType(StrEnum):
     NEUROPIXELS_NXT = "NXT"
 
     @classmethod
-    def from_subtype(cls, subtype: int) -> "ProbeType":
+    def from_subtype(cls, subtype: int) -> Self:
         """Get probe type from SpikeGLX subtype number."""
         from .constants import PROBE_TYPE_MAP
 
