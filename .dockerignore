@@ -1,0 +1,3 @@
+# Ignore information related to secrets
+.env
+.venv

@@ -1,0 +1,18 @@
+services:
+  channelmap-generator:
+    image: ghcr.io/m-beau/channelmap_generator:latest
+    container_name: channelmap-generator
+    pull_policy: always
+    ports:
+      - "5008:5008"
+    environment:
+      - INTERNAL_PORT=5008 #This number should reflect the port after the `:` above
+    volumes:
+      - ./output:/app/output
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:${INTERNAL_PORT}/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped

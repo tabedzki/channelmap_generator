@@ -1,0 +1,19 @@
+services:
+  channelmap-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: channelmap-generator
+    env_file:
+      - .env
+    ports:
+      - "${EXTERNAL_PORT}:${INTERNAL_PORT}"
+    volumes:
+      - ./output:/app/output
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:${INTERNAL_PORT}/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped

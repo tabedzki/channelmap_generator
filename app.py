@@ -1,14 +1,16 @@
-# For Ploomber serving
+# For general panel serving, both in Docker and in Ploomber
 
 import os
 import sys
 from pathlib import Path
+
 import panel as pn
+
+from channelmap_generator.gui.gui import create_app
 
 pn.extension()
 
 sys.path.insert(0, str(Path(__file__).parent))
-from channelmap_generator.gui.gui import create_app
 
 app = create_app()
 
