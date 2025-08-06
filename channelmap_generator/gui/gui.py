@@ -6,7 +6,6 @@ Using Bokeh for better interactivity with hover, click, and rectangular selectio
 
 import re
 import socket
-import sys
 from io import BytesIO, StringIO
 from pathlib import Path
 
@@ -29,15 +28,10 @@ from bokeh.models import (
 )
 from bokeh.plotting import figure
 
-# Handle imports that work both as script and as package module
-try:
-    # Try relative import (works when run as module: python -m channelmap_generator.gui.gui)
-    from .. import backend
-except ImportError:
-    # Fall back to absolute import (works when run as script: python gui.py)
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    import backend
+from channelmap_generator.constants import PROBE_N, PROBE_TYPE_MAP, SUPPORTED_1shank_PRESETS, SUPPORTED_4shanks_PRESETS
+from channelmap_generator.utils import imro
 
+from .. import backend
 
 # Paths to assets
 WIRING_MAPS_DIR = Path(__file__).resolve().parent.parent / "wiring_maps"
@@ -56,13 +50,11 @@ class ChannelmapGUIBokeh(param.Parameterized):
     # Parameters - will take their value as attributes after class initialization
     default_type = "2.0-4shanks"
 
-    probe_type = param.Selector(
-        default=default_type, objects=list(backend.PROBE_TYPE_MAP.keys()), doc="Neuropixels probe type"
-    )
+    probe_type = param.Selector(default=default_type, objects=list(PROBE_TYPE_MAP.keys()), doc="Neuropixels probe type")
 
     probe_subtype = param.Selector(
-        default=backend.PROBE_TYPE_MAP[default_type][0],
-        objects=backend.PROBE_TYPE_MAP[default_type],
+        default=PROBE_TYPE_MAP[default_type][0],
+        objects=PROBE_TYPE_MAP[default_type],
         doc="Specific probe subtype\n(don't worry too much about it - does not affect probe geometry or imro file structure)",
     )
 
@@ -85,8 +77,8 @@ class ChannelmapGUIBokeh(param.Parameterized):
     )
 
     preset = param.Selector(
-        default=backend.SUPPORTED_4shanks_PRESETS[0],
-        objects=backend.SUPPORTED_4shanks_PRESETS,
+        default=SUPPORTED_4shanks_PRESETS[0],
+        objects=SUPPORTED_4shanks_PRESETS,
         doc="Channel map common presets",
     )
 
@@ -137,7 +129,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
         self.wiring_file = self.wiring_maps_dir / wire_file
 
         # Probe subtype update
-        self.param.probe_subtype.objects = backend.PROBE_TYPE_MAP[self.probe_type]
+        self.param.probe_subtype.objects = PROBE_TYPE_MAP[self.probe_type]
         self.probe_subtype = self.param.probe_subtype.objects[0]
 
         # Load data
@@ -146,12 +138,12 @@ class ChannelmapGUIBokeh(param.Parameterized):
 
         # Update preset options based on probe type
         if self.probe_type in ["1.0", "2.0-1shank"]:
-            self.param.preset.objects = backend.SUPPORTED_1shank_PRESETS
+            self.param.preset.objects = SUPPORTED_1shank_PRESETS
             # For single shank probes, only shank 0 is available
             self.param.shank_selector.objects = [0]
             self.shank_selector = 0
         else:
-            self.param.preset.objects = backend.SUPPORTED_4shanks_PRESETS
+            self.param.preset.objects = SUPPORTED_4shanks_PRESETS
             # For multi-shank probes, all 4 shanks are available
             self.param.shank_selector.objects = [0, 1, 2, 3]
             if self.shank_selector not in [0, 1, 2, 3]:
@@ -507,7 +499,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
             elif self.select_mode == "zigzag_select":
                 print(f"Box zigzag select: {len(new)} electrodes")
                 # zigzag logic - even electrodes in 1.0, 0, 3, 4, 7, 8... if 2.0
-                N_per_shank = backend.PROBE_N[self.probe_type]["N"]
+                N_per_shank = PROBE_N[self.probe_type]["N"]
                 if self.probe_type == "1.0":
                     zigzag_subset = np.arange(0, N_per_shank, 2)
                 else:
@@ -728,7 +720,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
         selected_array = np.array(list(self.selected_electrodes))
 
         # Generate IMRO list
-        self.imro_list = backend.generate_imro_channelmap(
+        self.imro_list = imro.generate_imro_channelmap(
             probe_type=self.probe_type,
             custom_electrodes=selected_array,
             wiring_file=self.wiring_file,
@@ -798,7 +790,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
         imro_file_content = self.imro_file_loader.value
         if isinstance(imro_file_content, bytes):
             imro_file_content = imro_file_content.decode("utf-8")
-        imro_list = backend.parse_imro_file(imro_file_content.strip())
+        imro_list = imro.parse_imro_file(imro_file_content.strip())
         (
             selected_electrodes,
             self.probe_type,  # probe_type value is a monitored param - simply setting its value will update the plot
@@ -807,7 +799,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
             self.ap_gain_input.value,
             self.lf_gain_input.value,
             self.hardware_hp_filter_on,
-        ) = backend.parse_imro_list(imro_list)
+        ) = imro.parse_imro_list(imro_list)
 
         self.selected_electrodes = set(map(tuple, selected_electrodes))
         self.update_forbidden_electrodes()
@@ -1260,12 +1252,6 @@ def main(show=True):
     # Create app
     app = create_app()
 
-    # Load environment variables
-
     # Serve the app
     port = find_free_port(5003)
     pn.serve(app, port=port, show=show, title="Neuropixels Channelmap Generator", verbose=True)
-
-
-if __name__ == "__main__":
-    main()
