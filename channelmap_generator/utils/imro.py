@@ -4,8 +4,10 @@
 
 
 import numpy as np
+import pandas as pd
 
-from channelmap_generator.constants import PROBE_TYPE_MAP, REF_ELECTRODES
+from channelmap_generator.backend import format_imro_string, get_electrodes
+from channelmap_generator.constants import PROBE_N, PROBE_TYPE_MAP, REF_ELECTRODES
 
 
 def save_to_imro_file(imro_list, filename="channelmap.imro"):
@@ -169,3 +171,59 @@ def parse_imro_list(imro_list):
     selected_electrodes = np.array(selected_electrodes, dtype=int)
 
     return selected_electrodes, probe_type, probe_subtype, reference_id, ap_gain, lf_gain, hp_filter
+
+
+
+def generate_imro_channelmap(
+    probe_type,
+    layout_preset=None,
+    reference_id="ext",
+    probe_subtype=None,
+    custom_electrodes=None,
+    wiring_file=None,
+    ap_gain=500,
+    lf_gain=250,
+    hp_filter=1,
+):
+    """
+    Generate IMRO-formatted channelmap for Neuropixels probes.
+
+    Args:
+        probe_type: Type of probe ("1.0", "2.0-1shank", "2.0-4shanks", "NXT")
+        layout_preset: Preset layout configuration
+        reference_id: Reference electrode selection ('ext', 'tip', 'gnd')
+        probe_subtype: Specific SpikeGLX type number (optional)
+        custom_electrodes: list of custom (shank_id, electrode_id) pairs (overrides preset)
+        positions_file: Path to positions CSV file
+        wiring_file: Path to wiring CSV file
+        ap_gain: AP band gain (for 1.0 probes)
+        lf_gain: LF band gain (for 1.0 probes)
+        hp_filter: High-pass filter setting (for 1.0 probes)
+
+    Returns:
+        IMRO-formatted string for channelmap
+    """
+
+    # 1) Process probe type and load CSVs
+    if probe_subtype is None:
+        probe_subtype = PROBE_TYPE_MAP[probe_type][0]
+
+    wiring_df = pd.read_csv(wiring_file)
+
+    # 2) Select electrodes from presets or custom
+    selected_electrodes = get_electrodes(probe_type, wiring_df, layout_preset, custom_electrodes)
+
+    # 3) Generate IMRO table with appropriate format
+    imro_list = format_imro_string(
+        selected_electrodes, wiring_df, probe_type, probe_subtype, reference_id, ap_gain, lf_gain, hp_filter
+    )
+
+    n_selected = len(imro_list) - 1
+    n_possible = PROBE_N[probe_type]["n"]
+
+    if n_selected != n_possible:
+        print(
+            f"\n!! WARNING !!\nYou selected {n_selected} electrodes, but {probe_type} probes must record from {n_possible} simultaneously!\n"
+        )
+
+    return imro_list

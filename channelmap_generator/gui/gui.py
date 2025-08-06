@@ -29,7 +29,8 @@ from bokeh.models import (
 )
 from bokeh.plotting import figure
 
-import channelmap_generator.utils.imro as imro_io
+from channelmap_generator.constants import PROBE_N, PROBE_TYPE_MAP, SUPPORTED_1shank_PRESETS, SUPPORTED_4shanks_PRESETS
+from channelmap_generator.utils import imro
 
 # Handle imports that work both as script and as package module
 try:
@@ -58,13 +59,11 @@ class ChannelmapGUIBokeh(param.Parameterized):
     # Parameters - will take their value as attributes after class initialization
     default_type = "2.0-4shanks"
 
-    probe_type = param.Selector(
-        default=default_type, objects=list(backend.PROBE_TYPE_MAP.keys()), doc="Neuropixels probe type"
-    )
+    probe_type = param.Selector(default=default_type, objects=list(PROBE_TYPE_MAP.keys()), doc="Neuropixels probe type")
 
     probe_subtype = param.Selector(
-        default=backend.PROBE_TYPE_MAP[default_type][0],
-        objects=backend.PROBE_TYPE_MAP[default_type],
+        default=PROBE_TYPE_MAP[default_type][0],
+        objects=PROBE_TYPE_MAP[default_type],
         doc="Specific probe subtype\n(don't worry too much about it - does not affect probe geometry or imro file structure)",
     )
 
@@ -87,8 +86,8 @@ class ChannelmapGUIBokeh(param.Parameterized):
     )
 
     preset = param.Selector(
-        default=backend.SUPPORTED_4shanks_PRESETS[0],
-        objects=backend.SUPPORTED_4shanks_PRESETS,
+        default=SUPPORTED_4shanks_PRESETS[0],
+        objects=SUPPORTED_4shanks_PRESETS,
         doc="Channel map common presets",
     )
 
@@ -139,7 +138,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
         self.wiring_file = self.wiring_maps_dir / wire_file
 
         # Probe subtype update
-        self.param.probe_subtype.objects = backend.PROBE_TYPE_MAP[self.probe_type]
+        self.param.probe_subtype.objects = PROBE_TYPE_MAP[self.probe_type]
         self.probe_subtype = self.param.probe_subtype.objects[0]
 
         # Load data
@@ -148,12 +147,12 @@ class ChannelmapGUIBokeh(param.Parameterized):
 
         # Update preset options based on probe type
         if self.probe_type in ["1.0", "2.0-1shank"]:
-            self.param.preset.objects = backend.SUPPORTED_1shank_PRESETS
+            self.param.preset.objects = SUPPORTED_1shank_PRESETS
             # For single shank probes, only shank 0 is available
             self.param.shank_selector.objects = [0]
             self.shank_selector = 0
         else:
-            self.param.preset.objects = backend.SUPPORTED_4shanks_PRESETS
+            self.param.preset.objects = SUPPORTED_4shanks_PRESETS
             # For multi-shank probes, all 4 shanks are available
             self.param.shank_selector.objects = [0, 1, 2, 3]
             if self.shank_selector not in [0, 1, 2, 3]:
@@ -190,7 +189,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
             electrode_width = 15
             electrode_height = 9 if self.probe_type == "2.0-1shank" else 14
 
-            for (shank_id, electrode_id, orig_x, y) in positions:
+            for shank_id, electrode_id, orig_x, y in positions:
                 # Map x position to shank width
                 if self.probe_type == "1.0":
                     x_norm = (orig_x - 35) / 24
@@ -202,17 +201,17 @@ class ChannelmapGUIBokeh(param.Parameterized):
                 # Determine electrode status and color
                 status, color, alpha, line_color, line_width = self.get_electrode_status(shank_id, electrode_id)
 
-                electrode_data['x'].append(x)
-                electrode_data['y'].append(y)
-                electrode_data['width'].append(electrode_width)
-                electrode_data['height'].append(electrode_height)
-                electrode_data['shank_id'].append(shank_id)
-                electrode_data['electrode_id'].append(electrode_id)
-                electrode_data['color'].append(color)
-                electrode_data['alpha'].append(alpha)
-                electrode_data['line_color'].append(line_color)
-                electrode_data['line_width'].append(line_width)
-                electrode_data['status'].append(status)
+                electrode_data["x"].append(x)
+                electrode_data["y"].append(y)
+                electrode_data["width"].append(electrode_width)
+                electrode_data["height"].append(electrode_height)
+                electrode_data["shank_id"].append(shank_id)
+                electrode_data["electrode_id"].append(electrode_id)
+                electrode_data["color"].append(color)
+                electrode_data["alpha"].append(alpha)
+                electrode_data["line_color"].append(line_color)
+                electrode_data["line_width"].append(line_width)
+                electrode_data["status"].append(status)
 
         else:
             # Multi-shank
@@ -221,7 +220,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
             electrode_width = 12
             electrode_height = 8
 
-            for (shank_id, electrode_id, orig_x, y) in positions:
+            for shank_id, electrode_id, orig_x, y in positions:
                 # Calculate shank center
                 x_center = shank_id * shank_spacing
 
@@ -232,17 +231,17 @@ class ChannelmapGUIBokeh(param.Parameterized):
                 # Determine electrode status and color
                 status, color, alpha, line_color, line_width = self.get_electrode_status(shank_id, electrode_id)
 
-                electrode_data['x'].append(x)
-                electrode_data['y'].append(y)
-                electrode_data['width'].append(electrode_width)
-                electrode_data['height'].append(electrode_height)
-                electrode_data['shank_id'].append(shank_id)
-                electrode_data['electrode_id'].append(electrode_id)
-                electrode_data['color'].append(color)
-                electrode_data['alpha'].append(alpha)
-                electrode_data['line_color'].append(line_color)
-                electrode_data['line_width'].append(line_width)
-                electrode_data['status'].append(status)
+                electrode_data["x"].append(x)
+                electrode_data["y"].append(y)
+                electrode_data["width"].append(electrode_width)
+                electrode_data["height"].append(electrode_height)
+                electrode_data["shank_id"].append(shank_id)
+                electrode_data["electrode_id"].append(electrode_id)
+                electrode_data["color"].append(color)
+                electrode_data["alpha"].append(alpha)
+                electrode_data["line_color"].append(line_color)
+                electrode_data["line_width"].append(line_width)
+                electrode_data["status"].append(status)
 
         # Create ColumnDataSource
         self.electrode_source = ColumnDataSource(data=electrode_data)
@@ -263,10 +262,14 @@ class ChannelmapGUIBokeh(param.Parameterized):
         """Setup the electrode rectangles in Bokeh"""
         # Draw electrodes as rectangles
         self.electrode_renderer = self.plot.rect(
-            x='x', y='y',
-            width='width', height='height',
-            fill_color='color', fill_alpha='alpha',
-            line_color='line_color', line_width='line_width',
+            x="x",
+            y="y",
+            width="width",
+            height="height",
+            fill_color="color",
+            fill_alpha="alpha",
+            line_color="line_color",
+            line_width="line_width",
             source=self.electrode_source,
             hover_fill_color="yellow",
             hover_line_color="orange",
@@ -293,23 +296,28 @@ class ChannelmapGUIBokeh(param.Parameterized):
             shank_y = [max_y + 100, max_y + 100, min_y, min_y - tip_height, min_y, max_y + 100]
 
             self.plot.line(shank_x, shank_y, line_width=3, color="black", alpha=1)
-            self.plot.x_range=Range1d(xlim[0], xlim[1])
+            self.plot.x_range = Range1d(xlim[0], xlim[1])
 
             # Bank labels
             for bank_i in np.arange(0, len(positions), 384):
                 if bank_i < len(positions):
                     bank_y = positions[bank_i, -1]
-                    self.plot.line([-shank_width/2, shank_width/2], [bank_y, bank_y],
-                                 line_width=2, color="gray", alpha=0.7)
-                    self.plot.text([shank_width/2 + 3], [bank_y],
-                                 text=[f'Bank {bank_i//384}'],
-                                 text_font_size="10pt", text_color="gray")
+                    self.plot.line(
+                        [-shank_width / 2, shank_width / 2], [bank_y, bank_y], line_width=2, color="gray", alpha=0.7
+                    )
+                    self.plot.text(
+                        [shank_width / 2 + 3],
+                        [bank_y],
+                        text=[f"Bank {bank_i // 384}"],
+                        text_font_size="10pt",
+                        text_color="gray",
+                    )
 
         else:
             # Multi-shank outlines
             shank_width = 60
             shank_spacing = 150
-            xlim = [-shank_width/2 - 100, 3 * shank_spacing + shank_width/2 + 100]
+            xlim = [-shank_width / 2 - 100, 3 * shank_spacing + shank_width / 2 + 100]
 
             for shank_id in range(4):
                 shank_mask = positions[:, 0] == shank_id
@@ -320,36 +328,52 @@ class ChannelmapGUIBokeh(param.Parameterized):
                 tip_height = (max_y - min_y) * 0.08
 
                 # Shank outline
-                shank_x = [x_center - shank_width/2, x_center + shank_width/2,
-                          x_center + shank_width/2, x_center,
-                          x_center - shank_width/2, x_center - shank_width/2]
-                shank_y = [max_y + 100, max_y + 100, min_y, min_y - tip_height,
-                           min_y, max_y + 100]
+                shank_x = [
+                    x_center - shank_width / 2,
+                    x_center + shank_width / 2,
+                    x_center + shank_width / 2,
+                    x_center,
+                    x_center - shank_width / 2,
+                    x_center - shank_width / 2,
+                ]
+                shank_y = [max_y + 100, max_y + 100, min_y, min_y - tip_height, min_y, max_y + 100]
 
                 self.plot.line(shank_x, shank_y, line_width=3, color="black", alpha=1)
-                self.plot.x_range=Range1d(xlim[0], xlim[1])
+                self.plot.x_range = Range1d(xlim[0], xlim[1])
 
                 # Shank label
-                self.plot.text([x_center], [min_y - tip_height - 100],
-                             text=[f'Shank {shank_id}'],
-                             text_font_size="12pt", text_color="black",
-                             text_align="center")
+                self.plot.text(
+                    [x_center],
+                    [min_y - tip_height - 100],
+                    text=[f"Shank {shank_id}"],
+                    text_font_size="12pt",
+                    text_color="black",
+                    text_align="center",
+                )
 
                 # Bank lines and labels
                 for bank_i in np.arange(0, len(positions[shank_mask]), 384):
                     if bank_i < len(positions[shank_mask]):
                         bank_y = positions[shank_mask][bank_i, -1]
-                        self.plot.line([x_center - shank_width/2, x_center + shank_width/2],
-                                        [bank_y, bank_y], line_width=2, color="gray", alpha=0.7)
-                        if shank_id == 3: # Bank labels (only on rightmost shank)
-                            self.plot.text([x_center + shank_width/2 + 5], [bank_y],
-                                            text=[f'Bank {bank_i//384}'],
-                                            text_font_size="10pt", text_color="gray")
+                        self.plot.line(
+                            [x_center - shank_width / 2, x_center + shank_width / 2],
+                            [bank_y, bank_y],
+                            line_width=2,
+                            color="gray",
+                            alpha=0.7,
+                        )
+                        if shank_id == 3:  # Bank labels (only on rightmost shank)
+                            self.plot.text(
+                                [x_center + shank_width / 2 + 5],
+                                [bank_y],
+                                text=[f"Bank {bank_i // 384}"],
+                                text_font_size="10pt",
+                                text_color="gray",
+                            )
 
         # Set appropriate axis limits
         self.plot.axis.visible = False
         self.plot.grid.visible = False
-
 
     #####################################
     ##### Electrode selection logic #####
@@ -366,10 +390,11 @@ class ChannelmapGUIBokeh(param.Parameterized):
                 console.log('Tap tool activated');
                 const indices = source.selected.indices;
                 console.log('Selected indices:', indices);
-            """)
+            """,
+            )
 
         # Python callbacks for interactions - this is the key part
-        self.electrode_source.selected.on_change('indices', self.on_electrode_selection)
+        self.electrode_source.selected.on_change("indices", self.on_electrode_selection)
 
     def get_max_electrodes(self):
         """Get maximum allowed electrodes for current probe type"""
@@ -409,8 +434,8 @@ class ChannelmapGUIBokeh(param.Parameterized):
         # For single tap (one electrode)
         if len(new) == 1:
             idx = new[0]
-            shank_id = self.electrode_source.data['shank_id'][idx]
-            electrode_id = self.electrode_source.data['electrode_id'][idx]
+            shank_id = self.electrode_source.data["shank_id"][idx]
+            electrode_id = self.electrode_source.data["electrode_id"][idx]
 
             print(f"Single tap: electrode {electrode_id} on shank {shank_id}")
 
@@ -442,8 +467,8 @@ class ChannelmapGUIBokeh(param.Parameterized):
                 valid_deselections = []
 
                 for idx in new:
-                    shank_id = self.electrode_source.data['shank_id'][idx]
-                    electrode_id = self.electrode_source.data['electrode_id'][idx]
+                    shank_id = self.electrode_source.data["shank_id"][idx]
+                    electrode_id = self.electrode_source.data["electrode_id"][idx]
 
                     # Only deselect if it's currently selected (red)
                     if (shank_id, electrode_id) in self.selected_electrodes:
@@ -462,8 +487,8 @@ class ChannelmapGUIBokeh(param.Parameterized):
                 current_count = len(self.selected_electrodes)
 
                 for idx in new:
-                    shank_id = self.electrode_source.data['shank_id'][idx]
-                    electrode_id = self.electrode_source.data['electrode_id'][idx]
+                    shank_id = self.electrode_source.data["shank_id"][idx]
+                    electrode_id = self.electrode_source.data["electrode_id"][idx]
 
                     # Only select if it's currently unselected (grey) and we haven't hit the limit
                     if (
@@ -483,7 +508,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
             elif self.select_mode == "zigzag_select":
                 print(f"Box zigzag select: {len(new)} electrodes")
                 # zigzag logic - even electrodes in 1.0, 0, 3, 4, 7, 8... if 2.0
-                N_per_shank = backend.PROBE_N[self.probe_type]["N"]
+                N_per_shank = PROBE_N[self.probe_type]["N"]
                 if self.probe_type == "1.0":
                     zigzag_subset = np.arange(0, N_per_shank, 2)
                 else:
@@ -500,8 +525,8 @@ class ChannelmapGUIBokeh(param.Parameterized):
                 current_count = len(self.selected_electrodes)
 
                 for idx in new:
-                    shank_id = self.electrode_source.data['shank_id'][idx]
-                    electrode_id = self.electrode_source.data['electrode_id'][idx]
+                    shank_id = self.electrode_source.data["shank_id"][idx]
+                    electrode_id = self.electrode_source.data["electrode_id"][idx]
 
                     # Only select if it's currently unselected (grey) and we haven't hit the limit
                     if (
@@ -542,7 +567,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
 
     def update_electrode_colors(self):
         """Update electrode colors in the Bokeh plot"""
-        n_electrodes = len(self.electrode_source.data['shank_id'])
+        n_electrodes = len(self.electrode_source.data["shank_id"])
 
         colors = []
         alphas = []
@@ -551,8 +576,8 @@ class ChannelmapGUIBokeh(param.Parameterized):
         statuses = []
 
         for i in range(n_electrodes):
-            shank_id = self.electrode_source.data['shank_id'][i]
-            electrode_id = self.electrode_source.data['electrode_id'][i]
+            shank_id = self.electrode_source.data["shank_id"][i]
+            electrode_id = self.electrode_source.data["electrode_id"][i]
 
             status, color, alpha, line_color, line_width = self.get_electrode_status(shank_id, electrode_id)
 
@@ -563,13 +588,9 @@ class ChannelmapGUIBokeh(param.Parameterized):
             statuses.append(status)
 
         # Update the data source
-        self.electrode_source.data.update({
-            'color': colors,
-            'alpha': alphas,
-            'line_color': line_colors,
-            'line_width': line_widths,
-            'status': statuses
-        })
+        self.electrode_source.data.update(
+            {"color": colors, "alpha": alphas, "line_color": line_colors, "line_width": line_widths, "status": statuses}
+        )
 
     def apply_preset(self):
         """Apply selected preset configuration"""
@@ -708,16 +729,17 @@ class ChannelmapGUIBokeh(param.Parameterized):
         selected_array = np.array(list(self.selected_electrodes))
 
         # Generate IMRO list
-        self.imro_list = backend.generate_imro_channelmap(
-            probe_type = self.probe_type,
-            custom_electrodes = selected_array,
-            wiring_file = self.wiring_file,
-            layout_preset = None,
-            reference_id = self.reference_id,
-            probe_subtype = self.probe_subtype,
-            ap_gain = self.ap_gain_input.value,
-            lf_gain = self.lf_gain_input.value,
-            hp_filter = self.hardware_hp_filter_on)
+        self.imro_list = imro.generate_imro_channelmap(
+            probe_type=self.probe_type,
+            custom_electrodes=selected_array,
+            wiring_file=self.wiring_file,
+            layout_preset=None,
+            reference_id=self.reference_id,
+            probe_subtype=self.probe_subtype,
+            ap_gain=self.ap_gain_input.value,
+            lf_gain=self.lf_gain_input.value,
+            hp_filter=self.hardware_hp_filter_on,
+        )
 
     def generate_imro_content(self):
         if not self.ready_to_download():
@@ -752,13 +774,15 @@ class ChannelmapGUIBokeh(param.Parameterized):
 
         # Make figure
         title = f"Custom channelmap\n{self.probe_type}"
-        backend.plot_probe_layout(self.probe_type,
-                    self.imro_list,
-                    self.positions_file,
-                    self.wiring_file,
-                    title,
-                    figsize=(2, 30),
-                    save_plot=False)
+        backend.plot_probe_layout(
+            self.probe_type,
+            self.imro_list,
+            self.positions_file,
+            self.wiring_file,
+            title,
+            figsize=(2, 30),
+            save_plot=False,
+        )
 
         # Save current figure to buffer
         plt.savefig(buffer, format="pdf", dpi=300, bbox_inches="tight")
@@ -774,16 +798,17 @@ class ChannelmapGUIBokeh(param.Parameterized):
         # imro_file_content = list(self.imro_file_loader.value.values())[0] # for FileDropper() widget
         imro_file_content = self.imro_file_loader.value
         if isinstance(imro_file_content, bytes):
-            imro_file_content = imro_file_content.decode('utf-8')
-        imro_list = imro_io.parse_imro_file(imro_file_content.strip())
-        (selected_electrodes,
-        self.probe_type, # probe_type value is a monitored param - simply setting its value will update the plot
-        self.probe_subtype,
-        self.reference_id,
-        self.ap_gain_input.value,
-        self.lf_gain_input.value,
-        self.hardware_hp_filter_on,
-        ) = imro_io.parse_imro_list(imro_list)
+            imro_file_content = imro_file_content.decode("utf-8")
+        imro_list = imro.parse_imro_file(imro_file_content.strip())
+        (
+            selected_electrodes,
+            self.probe_type,  # probe_type value is a monitored param - simply setting its value will update the plot
+            self.probe_subtype,
+            self.reference_id,
+            self.ap_gain_input.value,
+            self.lf_gain_input.value,
+            self.hardware_hp_filter_on,
+        ) = imro.parse_imro_list(imro_list)
 
         self.selected_electrodes = set(map(tuple, selected_electrodes))
         self.update_forbidden_electrodes()
@@ -803,10 +828,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
         deselect_box_string = "Deselect Electrodes"
         zigzagselect_box_string = "Zigzag-select Electrodes"
 
-        self.box_select_tool = BoxSelectTool(
-            description=select_box_string,
-            icon=str(GUI_ASSETS_DIR / "selector.png")
-        )
+        self.box_select_tool = BoxSelectTool(description=select_box_string, icon=str(GUI_ASSETS_DIR / "selector.png"))
 
         self.box_deselect_tool = BoxSelectTool(
             description=deselect_box_string, icon=str(GUI_ASSETS_DIR / "deselector.png")
@@ -893,14 +915,11 @@ class ChannelmapGUIBokeh(param.Parameterized):
 
         tool_state.data = {active_tool: [tools_info]};
         """
-        js_code = js_code.replace('zigzagselect_box_string', zigzagselect_box_string)
-        js_code = js_code.replace('deselect_box_string', deselect_box_string)
-        js_code = js_code.replace('select_box_string', select_box_string)
+        js_code = js_code.replace("zigzagselect_box_string", zigzagselect_box_string)
+        js_code = js_code.replace("deselect_box_string", deselect_box_string)
+        js_code = js_code.replace("select_box_string", select_box_string)
 
-        JS_selection_monitor = CustomJS(
-            args=dict(tool_state=self.tool_state_source),
-            code=js_code
-        )
+        JS_selection_monitor = CustomJS(args=dict(tool_state=self.tool_state_source), code=js_code)
 
         # Hack - monitor random GUI events to trigger javascript fetch of selection box type
         self.plot.js_on_event("selectiongeometry", JS_selection_monitor)  # Selection events
@@ -914,7 +933,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
             active_tool = new["active_tool"][0]
             print(f"Selection made with tool: {active_tool}")
 
-            if active_tool == 'select':
+            if active_tool == "select":
                 self.select_mode = "select"
                 print("→ SELECT box activated")
             elif active_tool == "deselect":
@@ -952,11 +971,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
         )
 
         # Apply preset button
-        self.apply_button = pn.widgets.Button(
-            name="Apply Preset",
-            button_type="primary",
-            width=250
-        )
+        self.apply_button = pn.widgets.Button(name="Apply Preset", button_type="primary", width=250)
         self.apply_button.on_click(lambda event: self.apply_preset())
 
         # Clear selection button (moved to top, orange styling)
@@ -1064,7 +1079,6 @@ class ChannelmapGUIBokeh(param.Parameterized):
         )
         self.apply_uploaded_imro_button.on_click(lambda event: self.apply_uploaded_imro())
 
-
     def create_layout(self):
         """Create the main Panel layout"""
 
@@ -1083,9 +1097,10 @@ class ChannelmapGUIBokeh(param.Parameterized):
             self.clear_button,
             pn.Column(
                 pn.pane.Markdown("## Probe and recording metadata", margin=(-5, 0, 0, 10)),
-                pn.pane.Markdown("(see <a href='https://billkarsh.github.io/SpikeGLX/help/imroTables' target='_blank'>IMRO table anatomy</a>)",
-                                margin=(-15, 0, -5, 10)),
-
+                pn.pane.Markdown(
+                    "(see <a href='https://billkarsh.github.io/SpikeGLX/help/imroTables' target='_blank'>IMRO table anatomy</a>)",
+                    margin=(-15, 0, -5, 10),
+                ),
                 self.probe_type_selector,
                 pn.Row(
                     self.probe_subtype_selector,
@@ -1105,7 +1120,6 @@ class ChannelmapGUIBokeh(param.Parameterized):
             pn.pane.Markdown("## Preset Selection", margin=(10, 0, -5, 10)),
             self.preset_selector,
             self.apply_button,
-
             pn.pane.Markdown("## Textual Selection", margin=(10, 0, -5, 10)),
             self.shank_selector_widget,
             self.electrode_input,
@@ -1114,7 +1128,6 @@ class ChannelmapGUIBokeh(param.Parameterized):
             self.imro_file_loader,
             # pn.Spacer(height=30),
             self.apply_uploaded_imro_button,
-
             pn.pane.Markdown("## Export Channelmap", margin=(10, 0, -5, 10)),
             self.filename_input,
             pn.Row(
@@ -1254,4 +1267,4 @@ def main(show=True):
 
 
 if __name__ == "__main__":
-    main(show=True) # when run locally, makes the app pop up in the browser
+    main(show=True)  # when run locally, makes the app pop up in the browser
