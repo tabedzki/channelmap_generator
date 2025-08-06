@@ -6,7 +6,6 @@ Using Bokeh for better interactivity with hover, click, and rectangular selectio
 
 import re
 import socket
-import sys
 from io import BytesIO, StringIO
 from pathlib import Path
 
@@ -32,15 +31,7 @@ from bokeh.plotting import figure
 from channelmap_generator.constants import PROBE_N, PROBE_TYPE_MAP, SUPPORTED_1shank_PRESETS, SUPPORTED_4shanks_PRESETS
 from channelmap_generator.utils import imro
 
-# Handle imports that work both as script and as package module
-try:
-    # Try relative import (works when run as module: python -m channelmap_generator.gui.gui)
-    from .. import backend
-except ImportError:
-    # Fall back to absolute import (works when run as script: python gui.py)
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    import backend
-
+from .. import backend
 
 # Paths to assets
 WIRING_MAPS_DIR = Path(__file__).resolve().parent.parent / "wiring_maps"
@@ -1264,7 +1255,3 @@ def main(show=True):
     # Serve the app
     port = find_free_port(5003)
     pn.serve(app, port=port, show=show, title="Neuropixels Channelmap Generator", verbose=True)
-
-
-if __name__ == "__main__":
-    main(show=True)  # when run locally, makes the app pop up in the browser
