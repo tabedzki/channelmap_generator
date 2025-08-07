@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "channelmap-generator"
-version = "0.2.1"
+dynamic = ["version"]
 description = "Browser-based Neuropixels channelmap generator."
 readme = "README.md"
 license = {text = "MIT"}
@@ -41,6 +41,9 @@ Homepage = "https://github.com/m-beau/channelmap-generator"
 Documentation = "https://github.com/m-beau/channelmap-generator#readme"
 Repository = "https://github.com/m-beau/channelmap-generator"
 Issues = "https://github.com/m-beau/channelmap-generator/issues"
+
+[tool.setuptools.dynamic]
+version = {attr = "channelmap_generator.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -15,6 +15,10 @@ import numpy as np
 import pandas as pd
 import panel as pn
 import param
+
+import logging
+from bokeh.util.logconfig import basicConfig
+basicConfig(level=logging.ERROR) # no warnings
 from bokeh import events
 from bokeh.models import (
     BoxSelectTool,
@@ -29,6 +33,7 @@ from bokeh.models import (
 )
 from bokeh.plotting import figure
 
+from channelmap_generator import __version__
 from channelmap_generator.constants import PROBE_N, PROBE_TYPE_MAP, SUPPORTED_1shank_PRESETS, SUPPORTED_4shanks_PRESETS, WIRING_FILE_MAP
 from channelmap_generator.utils import imro
 from channelmap_generator.types import Electrode
@@ -98,6 +103,8 @@ class ChannelmapGUI(param.Parameterized):
 
     # Parameters - will take their value as attributes after class initialization
     default_type = "2.0-4shanks"
+    download_button_color = param.String(default="default")
+    download_button_label = param.String(default="Select electrodes...")
 
     probe_type = param.Selector(default=default_type, objects=list(PROBE_TYPE_MAP.keys()), doc="Neuropixels probe type")
 
@@ -902,25 +909,12 @@ class ChannelmapGUI(param.Parameterized):
             name="IMRO or PDF filename (omit extension)",
             value=f"manual_selection_{self.probe_type}",  # default filename defined here
             width=300,
+            margin=(0, 0, 0, 30)
         )
 
-        self.download_imro_button = pn.widgets.FileDownload(
-            callback=self.generate_imro_content,
-            filename=f"{self.filename_input.value}.imro",
-            button_type="success",
-            width=140,
-            icon="file-text",
-            label="Download IMRO ⬇",
-        )
-
-        self.download_pdf_button = pn.widgets.FileDownload(
-            callback=self.generate_pdf_content,
-            filename=f"{self.filename_input.value}.pdf",
-            button_type="success",
-            width=140,
-            icon="file-type-pdf",
-            label="Download PDF ⬇",
-        )
+        # Download buttons creation
+        # (in their own function to handle their reactive appearance)
+        self.create_download_buttons()
 
         # Prominent electrode counter (moved to top)
         self.electrode_counter = pn.pane.HTML(
@@ -932,7 +926,7 @@ class ChannelmapGUI(param.Parameterized):
             </div>
             """,
             width=300,
-            margin=(10, 10),
+            margin=(30, 10, 10, 10),
             align="center",
         )
 
@@ -973,22 +967,65 @@ class ChannelmapGUI(param.Parameterized):
         )
         self.apply_uploaded_imro_button.on_click(lambda event: self.apply_uploaded_imro())
 
+
+    def create_download_buttons(self):
+        """Create download buttons as a reactive pane"""
+        # This method recreates the buttons when color changes
+        self.download_imro_button = pn.widgets.FileDownload(
+            callback=self.generate_imro_content,
+            filename=f"{self.filename_input.value}.imro",
+            button_type=self.download_button_color,
+            width=140,
+            icon="file-text",
+            label=self.download_button_label,
+        )
+        
+        self.download_pdf_button = pn.widgets.FileDownload(
+            callback=self.generate_pdf_content,
+            filename=f"{self.filename_input.value}.pdf",
+            button_type=self.download_button_color,
+            width=140,
+            icon="file-type-pdf",
+            label=self.download_button_label.replace("IMRO", "PDF"),
+        )
+        
+        return pn.Row(
+            self.download_imro_button,
+            self.download_pdf_button,
+            sizing_mode="stretch_width",
+            margin=(0, 0, 0, 20),
+        )
+
+    @pn.depends('download_button_color', 'download_button_label')
+    def get_download_buttons(self):
+        """Reactive method that recreates buttons when color changes"""
+        return self.create_download_buttons()
+
     def create_layout(self):
         """Create the main Panel layout"""
+
+        # Counter and Downloader (fixed on the right)
+        downloader = pn.Column(
+            pn.Column(
+                self.electrode_counter,
+                self.clear_button,
+                margin=(0, 0, -10, 20),
+            ),
+            pn.pane.Markdown("## Export Channelmap", margin=(10, 0, -5, 30)),
+            self.filename_input,
+            self.get_download_buttons,
+        )
 
         # Controls panel (fixed on left)
         controls = pn.Column(
             pn.pane.Markdown(
                 (
-                    "<div style='text-align: center; padding: 12px;'><strong>See project at:"
+                    f"<div style='text-align: center; padding: 12px;'><strong>See project (v{__version__}) at:"
                     "<br><a href='https://github.com/m-beau/channelmap_generator' "
                     "target='_blank'>github.com/m-beau/channelmap_generator</a></strong></div>"
                 ),
-                margin=(0, 0, -10, 40),
+                margin=(0, 0, 0, 40),
             ),
-            # Prominent electrode counter at top
-            self.electrode_counter,
-            self.clear_button,
             pn.Column(
                 pn.pane.Markdown("## Probe and recording metadata", margin=(-5, 0, 0, 10)),
                 pn.pane.Markdown(
@@ -1022,13 +1059,7 @@ class ChannelmapGUI(param.Parameterized):
             self.imro_file_loader,
             # pn.Spacer(height=30),
             self.apply_uploaded_imro_button,
-            pn.pane.Markdown("## Export Channelmap", margin=(10, 0, -5, 10)),
-            self.filename_input,
-            pn.Row(
-                self.download_imro_button,
-                self.download_pdf_button,
-                sizing_mode="stretch_width",
-            ),
+
             pn.pane.Markdown("## Instructions", margin=(10, 0, -5, 10)),
             pn.pane.HTML("""
             <div style="font-size: 13px; line-height: 1.4; text-align: justify;">
@@ -1071,7 +1102,8 @@ class ChannelmapGUI(param.Parameterized):
             controls,
             pn.Spacer(width=370),  # Slightly wider than controls (350 + margin)
             plot_container,
-            sizing_mode="stretch_width",
+            downloader,
+            sizing_mode="fixed",
         )
 
         return layout
@@ -1104,30 +1136,32 @@ class ChannelmapGUI(param.Parameterized):
         # n_remaining = max_allowed - n_selected
 
         # Update electrode counter
-        if hasattr(self, "electrode_counter"):
-            if n_selected < max_allowed:
-                counter_html = f"""
-                <div style="background: #f0f8ff; border: 2px solid #4a90e2; border-radius: 8px;
-                            padding: 12px; text-align: center; font-size: 16px; font-weight: bold;
-                            color: #AA4A44;">
-                    Selected Electrodes: {n_selected}/{max_allowed}
-                </div>
-                """
-            else:
-                counter_html = f"""
-                <div style="background: #f0f8ff; border: 2px solid #4a90e2; border-radius: 8px;
-                            padding: 12px; text-align: center; font-size: 16px; font-weight: bold;
-                            color: #008000;">
-                    Selected Electrodes: {n_selected}/{max_allowed}<br>
-                    Ready for IMRO file generation!
-                </div>
-                """
-            self.electrode_counter.object = counter_html
+        if n_selected < max_allowed:
+            counter_html = f"""
+            <div style="background: #f0f8ff; border: 2px solid #4a90e2; border-radius: 8px;
+                        padding: 12px; text-align: center; font-size: 16px; font-weight: bold;
+                        color: #AA4A44;">
+                Selected Electrodes: {n_selected}/{max_allowed}
+            </div>
+            """
+            self.download_button_color = 'default'
+            self.download_button_label = "Select electrodes..."
+        else:
+            counter_html = f"""
+            <div style="background: #f0f8ff; border: 2px solid #4a90e2; border-radius: 8px;
+                        padding: 12px; text-align: center; font-size: 16px; font-weight: bold;
+                        color: #008000;">
+                Selected Electrodes: {n_selected}/{max_allowed}<br>
+                Ready for IMRO file generation!
+            </div>
+            """
+            self.download_button_color = 'success'
+            self.download_button_label = "Download IMRO ⬇"
+
+        self.electrode_counter.object = counter_html
 
 
 ## App creation utilities
-
-
 def find_free_port(start_port=5007):
     """Find next available port starting from start_port"""
     for port in range(start_port, start_port + 100):
