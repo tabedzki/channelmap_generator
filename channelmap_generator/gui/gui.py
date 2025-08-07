@@ -645,7 +645,7 @@ class ChannelmapGUI(param.Parameterized):
         buffer = BytesIO()
 
         # Make figure
-        title = f"Custom channelmap\n{self.probe_type}"
+        title = self.filename_input.value
         backend.plot_probe_layout(
             self.probe_type,
             self.imro_list,

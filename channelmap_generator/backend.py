@@ -621,6 +621,8 @@ def plot_probe_layout(
 
         ax.set_xlim(-shank_width // 2 - 20, shank_width // 2 + 20)
         ax.set_ylim(min_y - tip_height - 50, max_y + 100)
+
+        title = title.replace("_", " ")
         ax.set_title(title)
 
         # Style the plot - remove frame, grid, x-ticks
@@ -762,6 +764,8 @@ def plot_probe_layout(
 
         ax.set_xlim(-shank_width, n_shanks * shank_spacing)
         ax.set_ylim(overall_min_y - overall_tip_height - 50, overall_max_y + 100)
+
+        title = title.replace("_", " ")
         ax.set_title(title)
 
         # Style the plot - remove frame, grid, x-ticks
