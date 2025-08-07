@@ -2,6 +2,8 @@
 
 ⚡ Generate channel maps for Neuropixels probes that respect electrode-ADC wiring constraints! ⚡
 
+<center> <a href="https://neuropixels-channelmap-generator.pni.princeton.edu">>>> Online GUI <<<</a> </center>
+
 
 ## Installation
 
@@ -84,7 +86,7 @@ You can mix and match four selection methods:\
 Once you reach the **target number of electrodes** for the selected probe type (384 or 1536), you can **download your channelmap** as an IMRO file alongside a PDF rendering to easily remember what your channelmap looks like.
 
 > [!TIP]
-> **Online version**: This GUI is available online at [URL TBD] - you can use it directly in your browser without installing anything.
+> **Online version**: This GUI is available online at https://neuropixels-channelmap-generator.pni.princeton.edu - you can use it directly in your browser without installing anything.
 
 ![](channelmap_generator/gui/assets/GUI_screenshot.png)
 
