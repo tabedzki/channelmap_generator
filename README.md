@@ -2,7 +2,7 @@
 
 ⚡ Generate channel maps for Neuropixels probes that respect electrode-ADC wiring constraints! ⚡
 
-<center> <a href="https://neuropixels-channelmap-generator.pni.princeton.edu">>>> Online GUI <<<</a> </center>
+<div align="center"> <a href="https://neuropixels-channelmap-generator.pni.princeton.edu">>>> Online GUI <<<</a> </div>
 
 
 ## Installation
