@@ -8,6 +8,7 @@ import re
 import socket
 from io import BytesIO, StringIO
 from pathlib import Path
+from dataclasses import dataclass, field
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -28,9 +29,9 @@ from bokeh.models import (
 )
 from bokeh.plotting import figure
 
-from channelmap_generator.constants import PROBE_N, PROBE_TYPE_MAP, SUPPORTED_1shank_PRESETS, SUPPORTED_4shanks_PRESETS
+from channelmap_generator.constants import PROBE_N, PROBE_TYPE_MAP, SUPPORTED_1shank_PRESETS, SUPPORTED_4shanks_PRESETS, WIRING_FILE_MAP
 from channelmap_generator.utils import imro
-
+from channelmap_generator.types import Electrode
 from .. import backend
 
 # Paths to assets
@@ -44,7 +45,55 @@ DEFAULT_PORT = 5007
 pn.extension("tabulator")
 
 
-class ChannelmapGUIBokeh(param.Parameterized):
+###################################
+#### Electrode selection logic ####
+###################################
+
+@dataclass
+class Electrodes:
+    """Manages electrode selection state."""
+    
+    wiring_map: dict[Electrode, set[Electrode]]
+    n_maximum_electrodes: int # TODO: implement per-shank maximum for NXTs
+    available: set[Electrode] = field(default_factory=set)
+    selected: set[Electrode] = field(default_factory=set)
+    unavailable: set[Electrode] = field(default_factory=set)
+
+    def __post_init__(self):
+        self.available = set(self.wiring_map.keys())
+    
+    def select(self, electrode: Electrode):
+        if electrode in self.available \
+            and len(self.selected) < self.n_maximum_electrodes:
+            self.selected.add(electrode)
+            self.available.discard(electrode)
+
+            conflicting_electrodes = self.wiring_map[electrode]
+            newly_unavailable = conflicting_electrodes & self.available
+            self.available -= newly_unavailable
+            self.unavailable |= newly_unavailable
+    
+    def deselect(self, electrode: Electrode):
+        if electrode in self.selected:
+            self.selected.discard(electrode)
+            self.available.add(electrode)
+
+            nomore_conflicting_electrodes = self.wiring_map[electrode]
+            newly_available = nomore_conflicting_electrodes & self.unavailable
+            self.available |= newly_available
+            self.unavailable -= newly_available
+
+    def clear_selection(self):
+        self.available = set(self.wiring_map.keys())
+        self.selected = set()
+        self.unavailable = set()
+
+
+#################
+#### GUI app ####
+#################
+
+class ChannelmapGUI(param.Parameterized):
     """Main GUI class for interactive channelmap generation using Bokeh"""
 
     # Parameters - will take their value as attributes after class initialization
@@ -86,20 +135,21 @@ class ChannelmapGUIBokeh(param.Parameterized):
         default=0, objects=[0, 1, 2, 3], doc="Shank of electrodes selected in textbox below"
     )
 
+
     def __init__(self, **params):
         super().__init__(**params)
 
         # Initialize data
         self.wiring_maps_dir = WIRING_MAPS_DIR
-        self.selected_electrodes = set()  # Set of (shank_id, electrode_id) tuples
-        self.forbidden_electrodes = set()  # Set of (shank_id, electrode_id) tuples
+        self.wiring_maps = backend.make_wiring_maps(self.wiring_maps_dir)
+
+        # Probe plot geometry
         self.probe_plot_height = 2500
         self.probe_plot_width = 800
+
+        # Probe metadata
         self.ap_gain_default = 500
         self.lf_gain_default = 250
-
-        # Track which box select tool is being used
-        self.selectbox_id = None
 
         # Load initial data
         self.load_probe_data()
@@ -110,6 +160,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
         # Create widgets
         self.create_widgets()
 
+
     #####################################
     ##### Probe geometry and wiring #####
     #####################################
@@ -117,14 +168,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
     def load_probe_data(self):
         """Load wiring and position data for current probe type"""
         # File mapping
-        file_map = {
-            "1.0": ("1.0_positions.csv", "1.0_wiring.csv"),
-            "2.0-1shank": ("2.0-1shank_positions.csv", "2.0-1shank_wiring.csv"),
-            "2.0-4shanks": ("2.0-4shanks_positions.csv", "2.0-4shanks_wiring.csv"),
-            "NXT": ("2.0-4shanks_positions.csv", "2.0-4shanks_wiring.csv"),
-        }
-
-        pos_file, wire_file = file_map[self.probe_type]
+        pos_file, wire_file = WIRING_FILE_MAP[self.probe_type]
         self.positions_file = self.wiring_maps_dir / pos_file
         self.wiring_file = self.wiring_maps_dir / wire_file
 
@@ -135,6 +179,9 @@ class ChannelmapGUIBokeh(param.Parameterized):
         # Load data
         self.positions_df = pd.read_csv(self.positions_file)
         self.wiring_df = pd.read_csv(self.wiring_file)
+
+        # Initialize electrodes
+        self.electrodes = Electrodes(self.wiring_maps[self.probe_type], PROBE_N[self.probe_type]['n'])
 
         # Update preset options based on probe type
         if self.probe_type in ["1.0", "2.0-1shank"]:
@@ -150,9 +197,6 @@ class ChannelmapGUIBokeh(param.Parameterized):
                 self.shank_selector = 0
         self.preset = self.param.preset.objects[0]
 
-        # Reset selections
-        self.selected_electrodes.clear()
-        self.forbidden_electrodes.clear()
 
     def create_electrode_data(self):
         """Create the electrode data for Bokeh visualization"""
@@ -179,31 +223,6 @@ class ChannelmapGUIBokeh(param.Parameterized):
             shank_width = 100
             electrode_width = 15
             electrode_height = 9 if self.probe_type == "2.0-1shank" else 14
-
-            for shank_id, electrode_id, orig_x, y in positions:
-                # Map x position to shank width
-                if self.probe_type == "1.0":
-                    x_norm = (orig_x - 35) / 24
-                    x = x_norm * (shank_width * 0.7) / 2
-                else:
-                    x_norm = (orig_x - 16) / 16
-                    x = x_norm * (shank_width * 0.7) / 2
-
-                # Determine electrode status and color
-                status, color, alpha, line_color, line_width = self.get_electrode_status(shank_id, electrode_id)
-
-                electrode_data["x"].append(x)
-                electrode_data["y"].append(y)
-                electrode_data["width"].append(electrode_width)
-                electrode_data["height"].append(electrode_height)
-                electrode_data["shank_id"].append(shank_id)
-                electrode_data["electrode_id"].append(electrode_id)
-                electrode_data["color"].append(color)
-                electrode_data["alpha"].append(alpha)
-                electrode_data["line_color"].append(line_color)
-                electrode_data["line_width"].append(line_width)
-                electrode_data["status"].append(status)
-
         else:
             # Multi-shank
             shank_width = 60
@@ -211,43 +230,53 @@ class ChannelmapGUIBokeh(param.Parameterized):
             electrode_width = 12
             electrode_height = 8
 
-            for shank_id, electrode_id, orig_x, y in positions:
+        for shank_id, electrode_id, orig_x, y in positions:
+
+            # Map x position to shank width
+            if self.probe_type == "1.0":
+                x_norm = (orig_x - 35) / 24
+                x = x_norm * (shank_width * 0.7) / 2
+            elif self.probe_type == "2.0-1shank":
+                x_norm = (orig_x - 16) / 16
+                x = x_norm * (shank_width * 0.7) / 2
+            else: # 4-shanks 2.0 or NXT
                 # Calculate shank center
                 x_center = shank_id * shank_spacing
-
                 # Map electrode position within shank
                 x_norm = (orig_x - 16) / 16
                 x = x_center + x_norm * (shank_width * 0.7) / 2
 
-                # Determine electrode status and color
-                status, color, alpha, line_color, line_width = self.get_electrode_status(shank_id, electrode_id)
+            # Determine electrode status and color
+            status, color, alpha, line_color, line_width = self.get_electrode_plotting_params(Electrode(shank_id, electrode_id))
 
-                electrode_data["x"].append(x)
-                electrode_data["y"].append(y)
-                electrode_data["width"].append(electrode_width)
-                electrode_data["height"].append(electrode_height)
-                electrode_data["shank_id"].append(shank_id)
-                electrode_data["electrode_id"].append(electrode_id)
-                electrode_data["color"].append(color)
-                electrode_data["alpha"].append(alpha)
-                electrode_data["line_color"].append(line_color)
-                electrode_data["line_width"].append(line_width)
-                electrode_data["status"].append(status)
+            electrode_data["x"].append(x)
+            electrode_data["y"].append(y)
+            electrode_data["width"].append(electrode_width)
+            electrode_data["height"].append(electrode_height)
+            electrode_data["shank_id"].append(shank_id)
+            electrode_data["electrode_id"].append(electrode_id)
+            electrode_data["color"].append(color)
+            electrode_data["alpha"].append(alpha)
+            electrode_data["line_color"].append(line_color)
+            electrode_data["line_width"].append(line_width)
+            electrode_data["status"].append(status)
 
         # Create ColumnDataSource
         self.electrode_source = ColumnDataSource(data=electrode_data)
 
-    def get_electrode_status(self, shank_id, electrode_id):
+
+    def get_electrode_plotting_params(self, electrode: Electrode):
         """
         Get electrode appearance based on its status
         status, color, alpha, line_color, line_width
         """
-        if (shank_id, electrode_id) in self.selected_electrodes:
+        if electrode in self.electrodes.selected:
             return "Selected", "red", 1.0, "darkred", 0
-        elif (shank_id, electrode_id) in self.forbidden_electrodes:
-            return "Forbidden", "black", 1.0, "darkgray", 0
+        elif electrode in self.electrodes.unavailable:
+            return "Unavailable", "black", 1.0, "darkgray", 0
         else:  # unselected electrodes
             return "Unselected", "lightgray", 0.8, "gray", 0
+
 
     def setup_electrode_visualization(self):
         """Setup the electrode rectangles in Bokeh"""
@@ -269,6 +298,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
 
         # Add shank outlines and labels
         self.add_shank_outlines()
+
 
     def add_shank_outlines(self):
         """Add shank outlines and bank labels"""
@@ -366,195 +396,6 @@ class ChannelmapGUIBokeh(param.Parameterized):
         self.plot.axis.visible = False
         self.plot.grid.visible = False
 
-    #####################################
-    ##### Electrode selection logic #####
-    #####################################
-
-    def setup_interactions(self):
-        """Setup click and selection interactions"""
-        # Set up the TapTool to enable single electrode selection
-        tap_tool = self.plot.select_one(TapTool)
-        if tap_tool:
-            tap_tool.callback = CustomJS(
-                args=dict(source=self.electrode_source),
-                code="""
-                console.log('Tap tool activated');
-                const indices = source.selected.indices;
-                console.log('Selected indices:', indices);
-            """,
-            )
-
-        # Python callbacks for interactions - this is the key part
-        self.electrode_source.selected.on_change("indices", self.on_electrode_selection)
-
-    def get_max_electrodes(self):
-        """Get maximum allowed electrodes for current probe type"""
-        if self.probe_type in ["1.0", "2.0-1shank", "2.0-4shanks"]:
-            return 384
-        elif self.probe_type == "NXT":
-            return 1536
-        else:
-            return 384  # Default fallback
-
-    def can_select_electrode(self, shank_id, electrode_id):
-        """Check if an electrode can be selected"""
-        # Don't select if already forbidden
-        if (shank_id, electrode_id) in self.forbidden_electrodes:
-            return False
-
-        # Don't select if we're at the electrode limit and this electrode isn't already selected
-        if (shank_id, electrode_id) not in self.selected_electrodes:
-            max_electrodes = self.get_max_electrodes()
-            if len(self.selected_electrodes) >= max_electrodes:
-                print(f"Cannot select more electrodes: limit is {max_electrodes} for {self.probe_type}")
-                return False
-
-        return True
-
-    def on_electrode_selection(self, attr, old, new):
-        """Handle electrode selection changes (both tap and box select)"""
-        if not new:  # No selection
-            return
-
-        print(f"Selection changed: {old} -> {new}")
-        max_electrodes = self.get_max_electrodes()
-
-        # Identify type of selected box
-        self.selectbox_id = "???"
-
-        # For single tap (one electrode)
-        if len(new) == 1:
-            idx = new[0]
-            shank_id = self.electrode_source.data["shank_id"][idx]
-            electrode_id = self.electrode_source.data["electrode_id"][idx]
-
-            print(f"Single tap: electrode {electrode_id} on shank {shank_id}")
-
-            # Toggle electrode selection (only if allowed)
-            if (shank_id, electrode_id) in self.selected_electrodes:
-                # Always allow deselection
-                self.selected_electrodes.remove((shank_id, electrode_id))
-                print(f"Deselected electrode {electrode_id}")
-            else:
-                # Check if we can select this electrode
-                if self.can_select_electrode(shank_id, electrode_id):
-                    self.selected_electrodes.add((shank_id, electrode_id))
-                    print(f"Selected electrode {electrode_id}")
-                else:
-                    print(f"Cannot select electrode {electrode_id} (forbidden or limit reached)")
-
-        # For box select (multiple electrodes)
-        elif len(new) > 1:
-            # Determine which box tool was used by checking active tool
-            # Bokeh JS does not expose selected tools to python API...
-            # https://stackoverflow.com/questions/58210752/how-to-get-currently-active-tool-in-bokeh-figure
-            # no easy fix
-            # self.deselect_mode = False # in the future, use self.selectbox_id
-
-            if self.select_mode == "deselect":
-                print(f"Box deselect: {len(new)} electrodes")
-
-                # Only deselect currently selected (red) electrodes
-                valid_deselections = []
-
-                for idx in new:
-                    shank_id = self.electrode_source.data["shank_id"][idx]
-                    electrode_id = self.electrode_source.data["electrode_id"][idx]
-
-                    # Only deselect if it's currently selected (red)
-                    if (shank_id, electrode_id) in self.selected_electrodes:
-                        valid_deselections.append((shank_id, electrode_id))
-                        self.selected_electrodes.remove((shank_id, electrode_id))
-
-                print(f"Box deselect: removed {len(valid_deselections)} selected electrodes")
-                if len(valid_deselections) < len(new):
-                    print(f"Skipped {len(new) - len(valid_deselections)} electrodes (not selected)")
-
-            elif self.select_mode == "select":
-                print(f"Box select: {len(new)} electrodes")
-
-                # Only add electrodes that can be selected (grey/unselected)
-                valid_selections = []
-                current_count = len(self.selected_electrodes)
-
-                for idx in new:
-                    shank_id = self.electrode_source.data["shank_id"][idx]
-                    electrode_id = self.electrode_source.data["electrode_id"][idx]
-
-                    # Only select if it's currently unselected (grey) and we haven't hit the limit
-                    if (
-                        (shank_id, electrode_id) not in self.selected_electrodes
-                        and (shank_id, electrode_id) not in self.forbidden_electrodes
-                        and current_count < max_electrodes
-                    ):
-                        valid_selections.append((shank_id, electrode_id))
-                        self.selected_electrodes.add((shank_id, electrode_id))
-                        self.update_forbidden_electrodes()
-                        current_count += 1
-
-                print(f"Box select: added {len(valid_selections)} valid electrodes")
-                if len(valid_selections) < len(new):
-                    print(f"Skipped {len(new) - len(valid_selections)} electrodes (forbidden or limit reached)")
-
-            elif self.select_mode == "zigzag_select":
-                print(f"Box zigzag select: {len(new)} electrodes")
-                # zigzag logic - even electrodes in 1.0, 0, 3, 4, 7, 8... if 2.0
-                N_per_shank = PROBE_N[self.probe_type]["N"]
-                if self.probe_type == "1.0":
-                    zigzag_subset = np.arange(0, N_per_shank, 2)
-                else:
-                    zigzag_subset = []
-                    i = 0
-                    while i < N_per_shank:  # Limit to 192 channels for bank 0
-                        zigzag_subset.append(i)
-                        zigzag_subset.append(i + 3)
-                        i += 4
-                    zigzag_subset = np.array(zigzag_subset)
-
-                # Only add electrodes that can be selected (grey/unselected)
-                valid_selections = []
-                current_count = len(self.selected_electrodes)
-
-                for idx in new:
-                    shank_id = self.electrode_source.data["shank_id"][idx]
-                    electrode_id = self.electrode_source.data["electrode_id"][idx]
-
-                    # Only select if it's currently unselected (grey) and we haven't hit the limit
-                    if (
-                        (shank_id, electrode_id) not in self.selected_electrodes
-                        and (shank_id, electrode_id) not in self.forbidden_electrodes
-                        and electrode_id in zigzag_subset
-                        and current_count < max_electrodes
-                    ):
-                        valid_selections.append((shank_id, electrode_id))
-                        self.selected_electrodes.add((shank_id, electrode_id))
-                        self.update_forbidden_electrodes()
-                        current_count += 1
-
-                print(f"Box select: added {len(valid_selections)} valid electrodes")
-                if len(valid_selections) < len(new):
-                    print(f"Skipped {len(new) - len(valid_selections)} electrodes (forbidden or limit reached)")
-
-        # Update forbidden electrodes and visualization
-        self.update_forbidden_electrodes()
-        self.update_electrode_colors()
-        self.update_electrode_counter()
-
-        # Clear the selection to allow for new interactions
-        self.electrode_source.selected.indices = []
-
-    def update_forbidden_electrodes(self):
-        """Update forbidden electrodes based on current selection"""
-        if self.selected_electrodes:
-            selected_array = np.array(list(self.selected_electrodes))
-            forbidden_array = backend.find_forbidden_electrodes(selected_array, self.wiring_df)
-            self.forbidden_electrodes = set(map(tuple, forbidden_array))
-        else:
-            self.forbidden_electrodes.clear()
-
-    #########################################
-    ##### Electrode selection esthetics #####
-    #########################################
 
     def update_electrode_colors(self):
         """Update electrode colors in the Bokeh plot"""
@@ -569,8 +410,9 @@ class ChannelmapGUIBokeh(param.Parameterized):
         for i in range(n_electrodes):
             shank_id = self.electrode_source.data["shank_id"][i]
             electrode_id = self.electrode_source.data["electrode_id"][i]
+            electrode = Electrode(shank_id, electrode_id)
 
-            status, color, alpha, line_color, line_width = self.get_electrode_status(shank_id, electrode_id)
+            status, color, alpha, line_color, line_width = self.get_electrode_plotting_params(electrode)
 
             colors.append(color)
             alphas.append(alpha)
@@ -583,17 +425,92 @@ class ChannelmapGUIBokeh(param.Parameterized):
             {"color": colors, "alpha": alphas, "line_color": line_colors, "line_width": line_widths, "status": statuses}
         )
 
+
+    #####################################
+    ##### Electrode selection logic #####
+    #####################################
+
+    def on_electrode_selection(self, _, old, new):
+        """Handle electrode selection changes (both tap and box select)"""
+        if not new:  # No selection
+            return
+
+        print(f"Selection changed: {old} -> {new}")
+
+        # Single electrode selection - toggle
+        if len(new) == 1:
+            shank_id = self.electrode_source.data["shank_id"][new[0]]
+            electrode_id = self.electrode_source.data["electrode_id"][new[0]]
+            electrode = Electrode(shank_id, electrode_id)
+
+            if electrode in self.electrodes.selected:
+                self.electrodes.deselect(electrode)
+            else:
+                self.electrodes.select(electrode)
+
+        # Box selecttion (multiple electrodes)
+        elif len(new) > 1:
+
+            if self.select_mode == "deselect":
+                print(f"Box deselect: {len(new)} electrodes")
+                for idx in new:
+                    shank_id = self.electrode_source.data["shank_id"][idx]
+                    electrode_id = self.electrode_source.data["electrode_id"][idx]
+                    self.electrodes.deselect(Electrode(shank_id, electrode_id))
+
+
+            elif self.select_mode == "select":
+                print(f"Box select: {len(new)} electrodes")
+                for idx in new:
+                    shank_id = self.electrode_source.data["shank_id"][idx]
+                    electrode_id = self.electrode_source.data["electrode_id"][idx]
+                    self.electrodes.select(Electrode(shank_id, electrode_id))
+
+            elif self.select_mode == "zigzag_select":
+                # zigzag logic - even electrodes in 1.0, 0, 3, 4, 7, 8... if 2.0
+                print(f"Box zigzag select: {len(new)} electrodes")
+                zigzag_subset = self.get_zigzag_subset()
+                for idx in new:
+                    shank_id = self.electrode_source.data["shank_id"][idx]
+                    electrode_id = self.electrode_source.data["electrode_id"][idx]
+                    if electrode_id in zigzag_subset:
+                        self.electrodes.select(Electrode(shank_id, electrode_id))
+
+        # Update electrode visualization
+        self.update_electrode_colors()
+        self.update_electrode_counter()
+
+        # Clear the selection to allow for new interactions
+        self.electrode_source.selected.indices = []
+
+
+    def get_zigzag_subset(self):
+        N_per_shank = PROBE_N[self.probe_type]["N"]
+        if self.probe_type == "1.0":
+            zigzag_subset = np.arange(0, N_per_shank, 2)
+        else:
+            zigzag_subset = []
+            i = 0
+            while i < N_per_shank:  # Limit to 192 channels for bank 0
+                zigzag_subset.append(i)
+                zigzag_subset.append(i + 3)
+                i += 4
+            zigzag_subset = np.array(zigzag_subset)
+        return zigzag_subset
+
+
     def apply_preset(self):
         """Apply selected preset configuration"""
         if self.preset:
-            try:
-                preset_electrodes = backend.get_preset_candidates(self.preset, self.probe_type, self.wiring_df)
-                self.selected_electrodes = set(map(tuple, preset_electrodes))
-                self.update_forbidden_electrodes()
-                self.update_electrode_colors()
-                self.update_electrode_counter()
-            except Exception as e:
-                print(f"Error applying preset: {e}")
+            self.electrodes.clear_selection()
+            preset_electrodes = backend.get_preset_candidates(self.preset, self.probe_type, self.wiring_df)
+            for shank_id, electrode_id in preset_electrodes:
+                self.electrodes.select(Electrode(shank_id, electrode_id))
+            
+            # Update visualization
+            self.update_electrode_colors()
+            self.update_electrode_counter()
+
 
     def parse_electrode_input(self, text):
         """Parse electrode input string like '1,2,3,5,7' or '1-5,7'"""
@@ -627,68 +544,32 @@ class ChannelmapGUIBokeh(param.Parameterized):
 
         return electrodes
 
+
     def apply_electrode_input(self):
         """Add electrodes from text input to current selection (same logic as box selection)"""
         try:
             text = self.electrode_input.value
             electrodes = self.parse_electrode_input(text)
 
-            # Validate electrodes exist in the probe
-            max_electrode = self.positions_df["electrode"].max()
-            max_allowed = self.get_max_electrodes()
+            for (shank_id, electrode_id) in electrodes:
+                self.electrodes.select(Electrode(shank_id, electrode_id))
 
-            # Use same logic as box selection: only add unselected (grey) electrodes
-            added_count = 0
-            skipped_forbidden = 0
-            skipped_selected = 0
-            skipped_limit = 0
-
-            for shank_id, electrode_id in electrodes:
-                if 0 <= electrode_id <= max_electrode:
-                    # Check if electrode is already selected
-                    if (shank_id, electrode_id) in self.selected_electrodes:
-                        skipped_selected += 1
-                        continue
-
-                    # Check if electrode is forbidden
-                    if (shank_id, electrode_id) in self.forbidden_electrodes:
-                        skipped_forbidden += 1
-                        continue
-
-                    # Check if we're at the limit
-                    if len(self.selected_electrodes) >= max_allowed:
-                        skipped_limit += 1
-                        continue
-
-                    # Add the electrode (it's grey/unselected)
-                    self.selected_electrodes.add((shank_id, electrode_id))
-                    added_count += 1
-
-            # Update forbidden electrodes and visualization
-            if added_count > 0:
-                self.update_forbidden_electrodes()
-                self.update_electrode_colors()
-                self.update_electrode_counter()
-
-            # Provide feedback
-            print(f"Text input on shank {self.shank_selector}:")
-            print(f"  Added: {added_count} electrodes")
-            if skipped_selected > 0:
-                print(f"  Skipped: {skipped_selected} already selected")
-            if skipped_forbidden > 0:
-                print(f"  Skipped: {skipped_forbidden} forbidden")
-            if skipped_limit > 0:
-                print(f"  Skipped: {skipped_limit} due to limit ({max_allowed})")
+            # Update visualization
+            self.update_electrode_colors()
+            self.update_electrode_counter()
 
         except Exception as e:
             print(f"Error parsing electrode input: {e}")
 
+
     def clear_selection(self):
         """Clear all selected electrodes"""
-        self.selected_electrodes.clear()
-        self.forbidden_electrodes.clear()
+        self.electrodes.clear_selection()
+
+        # Update visualization
         self.update_electrode_colors()
         self.update_electrode_counter()
+
 
     ###############################
     ##### IMRO and PDF output #####
@@ -696,11 +577,11 @@ class ChannelmapGUIBokeh(param.Parameterized):
 
     def ready_to_download(self):
         # Check number of selected electrodes
-        if not self.selected_electrodes:
+        if not any(self.electrodes.selected):
             print("No electrodes selected")
             return False
-        n_selected = len(self.selected_electrodes)
-        max_allowed = self.get_max_electrodes()
+        n_selected = len(self.electrodes.selected)
+        max_allowed = self.electrodes.n_maximum_electrodes
         if n_selected < max_allowed:
             print(f"IMRO file NOT generated - you still have {max_allowed - n_selected} electrodes to select!")
             return False
@@ -717,7 +598,7 @@ class ChannelmapGUIBokeh(param.Parameterized):
         """Generate IMRO file from current selection"""
 
         # Convert selection to array format
-        selected_array = np.array(list(self.selected_electrodes))
+        selected_array = np.array([[e.shank_id, e.electrode_id] for e in  self.electrodes.selected])
 
         # Generate IMRO list
         self.imro_list = imro.generate_imro_channelmap(
@@ -783,26 +664,29 @@ class ChannelmapGUIBokeh(param.Parameterized):
         return buffer
 
     def apply_uploaded_imro(self):
+
         if not any(self.imro_file_loader.value):
             print("You must upload an imro file before applying it to the selection.")
             return
-        # imro_file_content = list(self.imro_file_loader.value.values())[0] # for FileDropper() widget
+        
         imro_file_content = self.imro_file_loader.value
         if isinstance(imro_file_content, bytes):
             imro_file_content = imro_file_content.decode("utf-8")
         imro_list = imro.parse_imro_file(imro_file_content.strip())
-        (
-            selected_electrodes,
-            self.probe_type,  # probe_type value is a monitored param - simply setting its value will update the plot
-            self.probe_subtype,
-            self.reference_id,
-            self.ap_gain_input.value,
-            self.lf_gain_input.value,
-            self.hardware_hp_filter_on,
+
+        (imro_electrodes,
+         self.probe_type,  # probe_type value is a monitored param - simply setting its value will update the plot
+         self.probe_subtype,
+         self.reference_id,
+         self.ap_gain_input.value,
+         self.lf_gain_input.value,
+         self.hardware_hp_filter_on,
         ) = imro.parse_imro_list(imro_list)
 
-        self.selected_electrodes = set(map(tuple, selected_electrodes))
-        self.update_forbidden_electrodes()
+        self.electrodes.clear_selection()
+        for shank_id, electrode_id in imro_electrodes:
+            self.electrodes.select(Electrode(shank_id, electrode_id))
+
         self.update_electrode_colors()
         self.update_electrode_counter()
 
@@ -865,8 +749,27 @@ class ChannelmapGUIBokeh(param.Parameterized):
         self.tool_state_source = ColumnDataSource(data={"active_tool": [""]})
         self.setup_tool_monitoring(select_box_string, deselect_box_string, zigzagselect_box_string)
 
+    def setup_interactions(self):
+        """Setup click and selection interactions"""
+        # Set up the TapTool to enable single electrode selection
+        tap_tool = self.plot.select_one(TapTool)
+        if tap_tool:
+            tap_tool.callback = CustomJS(
+                args=dict(source=self.electrode_source),
+                code="""
+                console.log('Tap tool activated');
+                const indices = source.selected.indices;
+                console.log('Selected indices:', indices);
+            """,
+            )
+
+        # Python callbacks for interactions - this is the key part
+        self.electrode_source.selected.on_change("indices", self.on_electrode_selection)
+
     def setup_tool_monitoring(self, select_box_string, deselect_box_string, zigzagselect_box_string):
         """JS callback to expose active tools in toolbar"""
+        # workaround https://stackoverflow.com/questions/58210752/how-to-get-currently-active-tool-in-bokeh-figure
+
         js_code = """
         let tools_info = 'Could not check tools';
         const tools = cb_obj.origin.toolbar.tools;
@@ -1195,9 +1098,9 @@ class ChannelmapGUIBokeh(param.Parameterized):
 
     def update_electrode_counter(self):
         """Update status information"""
-        n_selected = len(self.selected_electrodes)
-        # n_forbidden = len(self.forbidden_electrodes)
-        max_allowed = self.get_max_electrodes()
+        n_selected = len(self.electrodes.selected)
+        # n_unavailable = len(self.electrodes.unavailable)
+        max_allowed = self.electrodes.n_maximum_electrodes
         # n_remaining = max_allowed - n_selected
 
         # Update electrode counter
@@ -1239,7 +1142,7 @@ def find_free_port(start_port=5007):
 
 def create_app():
     """Create and configure the Panel app"""
-    gui = ChannelmapGUIBokeh()
+    gui = ChannelmapGUI()
     layout = gui.create_layout()
 
     # Update status initially

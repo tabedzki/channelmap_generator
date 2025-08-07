@@ -3,6 +3,7 @@
 #############
 
 from pathlib import Path
+import pickle
 
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
@@ -12,11 +13,14 @@ import pandas as pd
 from .constants import (
     PROBE_N,
     PROBE_TYPE_MAP,
+    WIRING_FILE_MAP,
     REF_BANKS,
     REF_ELECTRODES,
     SUPPORTED_1shank_PRESETS,
     SUPPORTED_4shanks_PRESETS,
 )
+
+from .types import Electrode
 
 ############################
 ## Channel map generation ##
@@ -89,6 +93,41 @@ def find_forbidden_electrodes(selected_electrodes, wiring_df):
         ]
 
     return np.array(forbidden_electrodes).astype(int)
+
+def make_wiring_maps(wiring_maps_dir):
+    "Precomputes electrode wiring conflict maps for each probe type."
+    wiring_maps_dir = Path(wiring_maps_dir)
+    assert wiring_maps_dir.exists(), f"{wiring_maps_dir} does not exist!"
+    cache_file = wiring_maps_dir / "wiring_maps.pkl"
+
+    # If pickled result found, preloads it
+    if cache_file.exists():
+        with open(cache_file, 'rb') as f:
+                wiring_maps = pickle.load(f)
+                return wiring_maps
+    
+    # Generate wiring maps
+    wiring_maps = {}
+    for probe_type in WIRING_FILE_MAP:
+
+        pos_file, wire_file = WIRING_FILE_MAP[probe_type]
+        positions_file = wiring_maps_dir / pos_file
+        wiring_file = wiring_maps_dir / wire_file
+        positions_df = pd.read_csv(positions_file)
+        wiring_df = pd.read_csv(wiring_file)
+
+        wiring_maps[probe_type] = {}
+        for (shank_id, electrode_id, _, _) in positions_df.values:
+            electrode = Electrode(shank_id=shank_id, electrode_id=electrode_id)
+            conflicting_electrodes = find_forbidden_electrodes([(shank_id, electrode_id)], wiring_df)
+            conflicting_electrodes = {Electrode(e[0], e[1]) for e in conflicting_electrodes}
+            wiring_maps[probe_type][electrode] = conflicting_electrodes
+
+    # Pickle result
+    with open(cache_file, 'wb') as f:
+        pickle.dump(wiring_maps, f)
+    
+    return wiring_maps
 
 
 def format_wiring_df(wiring_df):

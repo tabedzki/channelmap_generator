@@ -17,6 +17,13 @@ PROBE_N = { # N: number of physical electrodes; n: number of ACDs or channels
     "NXT": {'N': 5120, 'n':1536, 'n_per_shank':908}
 }
 
+WIRING_FILE_MAP = {
+    "1.0": ("1.0_positions.csv", "1.0_wiring.csv"),
+    "2.0-1shank": ("2.0-1shank_positions.csv", "2.0-1shank_wiring.csv"),
+    "2.0-4shanks": ("2.0-4shanks_positions.csv", "2.0-4shanks_wiring.csv"),
+    "NXT": ("2.0-4shanks_positions.csv", "2.0-4shanks_wiring.csv"),
+}
+
 # Reference electrode definitions
 REF_ELECTRODES = {
     21: {'ext':0, 'tip':1},

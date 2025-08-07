@@ -8,6 +8,8 @@ from typing import Self
 
 import numpy as np
 
+# Note: frozen attributes (@dataclass(frozen=True)) allows hashability
+# (thus usability as dictionnary keys or set elements)
 
 class ProbeType(StrEnum):
     """Supported Neuropixels probe types."""
@@ -72,16 +74,10 @@ class ParsedIMRO:
     lf_gain: int | None = None
     hp_filter: int | None = None
 
-
-@dataclass(frozen=True)
+@dataclass(frozen=True) 
 class Electrode:
-    """Represents an electrode with shank and electrode ID."""
+    """Neuropixels electrode electrode_id on shank shank_id."""
 
     shank_id: int
     electrode_id: int
 
-
-# Set-based types for efficient operations
-ElectrodeSet = set[Electrode]
-ForbiddenElectrodes = set[Electrode]
-WiringConstraints = dict[Electrode, set[Electrode]]
