@@ -2,8 +2,10 @@
 
 ⚡ Generate channel maps for Neuropixels probes that respect electrode-ADC wiring constraints! ⚡
 
-<div align="center"> <a href="https://neuropixels-channelmap-generator.pni.princeton.edu">>>> Online GUI <<<</a> </div>
+<div align="center"> <a href="https://neuropixels-channelmap-generator.pni.princeton.edu">>>> Online GUI <<<</a> </div><br>
 
+
+**Disclaimer**: this tool is in <u>beta</u> release and should be considered a work in progress, deployed early to gather feedback. The imro editor tools in SpikeGLX and Open Ephys work correctly. What we are providing here are tools to specify imro tables more easily and conveniently. However, it will take some time to debug all the issues in this beta. If you import one of our tables into SpikeGLX or Open Ephys, please be sure to double check that all the site selections, referencing, gains, and filter settings that get imported are what you intended.
 
 ## Installation
 

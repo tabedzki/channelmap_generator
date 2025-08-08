@@ -34,7 +34,7 @@ from bokeh.models import (
 from bokeh.plotting import figure
 
 from channelmap_generator import __version__
-from channelmap_generator.constants import PROBE_N, PROBE_TYPE_MAP, SUPPORTED_1shank_PRESETS, SUPPORTED_4shanks_PRESETS, WIRING_FILE_MAP
+from channelmap_generator.constants import PROBE_N, PROBE_TYPE_MAP, SUPPORTED_1shank_PRESETS, SUPPORTED_4shanks_PRESETS, WIRING_FILE_MAP, REF_ELECTRODES
 from channelmap_generator.utils import imro
 from channelmap_generator.types import Electrode
 from .. import backend
@@ -116,7 +116,7 @@ class ChannelmapGUI(param.Parameterized):
 
     reference_id = param.Selector(
         default="tip",
-        objects=["tip", "ext", "gnd"],
+        objects=["tip", "ext"],
         doc=(
             "Reference to use for recording (probe tip, external pad, or circuit ground (possible for some versions)."
             " Specific channels not implemented."
@@ -733,7 +733,7 @@ class ChannelmapGUI(param.Parameterized):
                 tooltips=[
                     ("Electrode", "@electrode_id"),
                     ("Shank", "@shank_id"),
-                    ("Position", "(@x, @y)"),
+                    ("Z position", "@y μm"),
                     ("Status", "@status"),
                 ]
             ),
@@ -1127,6 +1127,19 @@ class ChannelmapGUI(param.Parameterized):
         # ("object" attr of plot_pane is the bokeh plot self.plot)
         if hasattr(self, "plot_pane"):
             self.plot_pane.object = self.plot
+
+    @param.depends("probe_subtype", watch=True)
+    def on_probe_subtype_change(self):
+        """
+        Handle probe subtype changes - update reference_id objects based on REF_ELECTRODES mapping.
+        Param module monitors value changes of probe_subtype.
+        """
+        # Update reference_id parameter objects based on the new probe_subtype
+        self.param.reference_id.objects = list(REF_ELECTRODES[self.probe_subtype].keys())
+        
+        # Set reference_id to the first available option if current selection is not available
+        if self.reference_id not in self.param.reference_id.objects:
+            self.reference_id = self.param.reference_id.objects[0]
 
     def update_electrode_counter(self):
         """Update status information"""
