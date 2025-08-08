@@ -1011,7 +1011,7 @@ class ChannelmapGUI(param.Parameterized):
                 self.clear_button,
                 margin=(0, 0, -10, 20),
             ),
-            pn.pane.Markdown("## Export Channelmap", margin=(10, 0, -5, 30)),
+            pn.pane.Markdown("## Export IMRO table", margin=(10, 0, -5, 30)),
             self.filename_input,
             self.get_download_buttons,
         )
