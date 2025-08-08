@@ -22,9 +22,9 @@ def test_probe_type_from_subtype():
 
 
 def test_reference_type():
-    assert ReferenceType.EXTERNAL == "ext"
-    assert ReferenceType.TIP == "tip"
-    assert ReferenceType.GROUND == "gnd"
+    assert ReferenceType.EXTERNAL == "External"
+    assert ReferenceType.TIP == "Tip"
+    assert ReferenceType.GROUND == "Ground"
 
 
 def test_electrode_position():
@@ -66,7 +66,7 @@ def test_parsed_imro():
         selected_electrodes=selected_electrodes,
         probe_type=ProbeType.NEUROPIXELS_1_0,
         probe_subtype=1,
-        reference_id="ext",
+        reference_id="External",
         ap_gain=500,
         lf_gain=250,
         hp_filter=1,
@@ -75,7 +75,7 @@ def test_parsed_imro():
     assert np.array_equal(parsed.selected_electrodes, selected_electrodes)
     assert parsed.probe_type == ProbeType.NEUROPIXELS_1_0
     assert parsed.probe_subtype == 1
-    assert parsed.reference_id == "ext"
+    assert parsed.reference_id == "External"
     assert parsed.ap_gain == 500
     assert parsed.lf_gain == 250
     assert parsed.hp_filter == 1

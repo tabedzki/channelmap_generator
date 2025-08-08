@@ -152,11 +152,11 @@ def parse_imro_list(imro_list):
 
         # Convert reference value back to string
         ref_electrodes = REF_ELECTRODES[probe_subtype]
-        if "tip" in ref_electrodes and isinstance(ref_electrodes["tip"], list):
-            if reference_id in ref_electrodes["tip"]:
-                reference_id = "tip"
+        if "Tip" in ref_electrodes and isinstance(ref_electrodes["Tip"], list):
+            if reference_id in ref_electrodes["Tip"]:
+                reference_id = "Tip"
             else:
-                ref_map = {v: k for k, v in ref_electrodes.items() if k != "tip"}
+                ref_map = {v: k for k, v in ref_electrodes.items() if k != "Tip"}
                 reference_id = ref_map[reference_id]
         else:
             ref_map = {v: k for k, v in ref_electrodes.items()}
@@ -177,7 +177,7 @@ def parse_imro_list(imro_list):
 def generate_imro_channelmap(
     probe_type,
     layout_preset=None,
-    reference_id="ext",
+    reference_id="External",
     probe_subtype=None,
     custom_electrodes=None,
     wiring_file=None,
@@ -191,7 +191,7 @@ def generate_imro_channelmap(
     Args:
         probe_type: Type of probe ("1.0", "2.0-1shank", "2.0-4shanks", "NXT")
         layout_preset: Preset layout configuration
-        reference_id: Reference electrode selection ('ext', 'tip', 'gnd')
+        reference_id: Reference electrode selection ('External', 'Tip', 'Ground')
         probe_subtype: Specific SpikeGLX type number (optional)
         custom_electrodes: list of custom (shank_id, electrode_id) pairs (overrides preset)
         positions_file: Path to positions CSV file

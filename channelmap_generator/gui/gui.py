@@ -111,12 +111,12 @@ class ChannelmapGUI(param.Parameterized):
     probe_subtype = param.Selector(
         default=PROBE_TYPE_MAP[default_type][0],
         objects=PROBE_TYPE_MAP[default_type],
-        doc="Specific probe subtype\n(don't worry too much about it - does not affect probe geometry or imro file structure)",
+        doc="Specific probe subtype (does not affect probe geometry, but affects indexing of reference and bank. Plug your probe in SpikeGLX and save an imro file to find out its subtype.)",
     )
 
     reference_id = param.Selector(
-        default="tip",
-        objects=["tip", "ext"],
+        default="External",
+        objects=list(REF_ELECTRODES[PROBE_TYPE_MAP[default_type][0]].keys()),
         doc=(
             "Reference to use for recording (probe tip, external pad, or circuit ground (possible for some versions)."
             " Specific channels not implemented."

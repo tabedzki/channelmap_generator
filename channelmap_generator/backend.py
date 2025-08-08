@@ -183,19 +183,22 @@ def format_imro_string(electrodes, wiring_df, probe_type, probe_subtype, referen
             entries.append(entry)
 
     elif probe_type in ["2.0-4shanks", "NXT"]:
-        if reference_id == "tip" and isinstance(REF_ELECTRODES[probe_subtype]["tip"], list):
-            ref_values = REF_ELECTRODES[probe_subtype]["tip"]
-        else:  # same for 4 shanks if not tip
-            ref_values = [REF_ELECTRODES[probe_subtype][reference_id]] * 4
+        if reference_id == "Join Tips":
+            ref_values = REF_ELECTRODES[probe_subtype][reference_id]
+        else:  # apart from join tips, all electrodes share the same reference.
+            ref_values = [REF_ELECTRODES[probe_subtype][reference_id]] * PROBE_N[probe_type]['n']
+        assert len(ref_values) == len(electrodes),\
+            "Major error - mismatch between number of electrodes and number of reference ids"
 
         for (shank_id, electrode_id), (row, col) in zip(electrodes, df_coordinates):
             channel = int(wiring_df.loc[row, "channel"])
             bank = int(wiring_df.columns[col][-1])
-            entry = (channel, shank_id, bank, ref_values[shank_id], electrode_id)
+            entry = [channel, shank_id, bank, electrode_id] # reference added after sorting per channel
             entries.append(entry)
 
     # Sort by channel and format
     entries.sort(key=lambda x: x[0])
+    entries = [(e[0], e[1], e[2], ref, e[3]) for e, ref in zip(entries, ref_values)]
     header = (probe_subtype, len(entries))
     imro_list = [header] + entries
 
@@ -241,7 +244,7 @@ def get_preset_candidates(preset, probe_type, wiring_df):
 
     if probe_type == "1.0":
         # Single shank configurations for 1.0
-        if preset == "tip":
+        if preset == "Tip":
             # 0-383 of bank 0
             for row in range(384):
                 electrode_id = wiring_df.loc[row, "shank0-bank0"]
@@ -284,7 +287,7 @@ def get_preset_candidates(preset, probe_type, wiring_df):
 
     elif probe_type == "2.0-1shank":
         # Single shank configurations for 2.0-1shank
-        if preset == "tip":
+        if preset == "Tip":
             # 0-383 of bank 0
             for row in range(384):
                 electrode_id = wiring_df.loc[row, "shank0-bank0"]
