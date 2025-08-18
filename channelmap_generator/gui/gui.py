@@ -688,14 +688,18 @@ class ChannelmapGUI(param.Parameterized):
             imro_file_content = imro_file_content.decode("utf-8")
         imro_list = imro.parse_imro_file(imro_file_content.strip())
 
-        (imro_electrodes,
-         self.probe_type,  # probe_type value is a monitored param - simply setting its value will update the plot
-         self.probe_subtype,
-         self.reference_id,
-         self.ap_gain_input.value,
-         self.lf_gain_input.value,
-         self.hardware_hp_filter_on,
-        ) = imro.parse_imro_list(imro_list)
+        try:
+            (imro_electrodes,
+            self.probe_type,  # probe_type value is a monitored param - simply setting its value will update the plot
+            self.probe_subtype,
+            self.reference_id,
+            self.ap_gain_input.value,
+            self.lf_gain_input.value,
+            self.hardware_hp_filter_on,
+            ) = imro.parse_imro_list(imro_list)
+        except:
+            pn.state.notifications.error("Failed to parse uploaded imro file.")
+            return
 
         self.electrodes.clear_selection()
         for shank_id, electrode_id in imro_electrodes:

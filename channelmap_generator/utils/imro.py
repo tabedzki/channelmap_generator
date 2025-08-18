@@ -181,17 +181,21 @@ def parse_imro_list(imro_list):
 def ref_id_to_string(reference_id, probe_subtype):
     ref_map = {v: k for k, v in REF_ELECTRODES[probe_subtype].items() if k != "Join Tips"}
     if reference_id not in ref_map:
-        pn.state.notifications.error(f"Unexpected reference id {reference_id} for probe subtype {probe_subtype}!",
+        error_message = f"Unexpected reference id {reference_id} for probe subtype {probe_subtype}!"
+        pn.state.notifications.error(error_message,
                                     duration=10_000)
-    assert reference_id in ref_map,\
-            f"Unexpected reference id {reference_id} for probe subtype {probe_subtype}!"
+        raise AssertionError(error_message)
     return ref_map[reference_id]
+
 
 def check_entry_elements(n_expected_elements, entry, probe_type):
     n_entry_elements = len(entry)
     if n_entry_elements != n_expected_elements:
-        pn.state.notifications.error(f"Corrupt .imro file - IMRO table entries for {probe_type} probes should have {n_expected_elements} elements, not {n_entry_elements}.",
+        error_message = f"Corrupt .imro file - IMRO table entries for {probe_type} probes should have {n_expected_elements} elements, not {n_entry_elements}."
+        pn.state.notifications.error(error_message,
                                 duration=10_000)
+        raise AssertionError(error_message)
+
 
 def generate_imro_channelmap(
     probe_type,
