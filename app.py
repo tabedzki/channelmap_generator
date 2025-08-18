@@ -8,7 +8,7 @@ import panel as pn
 
 from channelmap_generator.gui.gui import create_app
 
-pn.extension()
+pn.extension(notifications=True)
 
 sys.path.insert(0, str(Path(__file__).parent))
 
