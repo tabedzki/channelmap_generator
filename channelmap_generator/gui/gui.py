@@ -47,7 +47,7 @@ GUI_ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 DEFAULT_PORT = 5007
 
 # Enable Panel extensions
-pn.extension("tabulator")
+pn.extension("tabulator", notifications=True)
 
 
 ###################################
@@ -672,8 +672,15 @@ class ChannelmapGUI(param.Parameterized):
 
     def apply_uploaded_imro(self):
 
-        if not any(self.imro_file_loader.value):
-            print("You must upload an imro file before applying it to the selection.")
+        if self.imro_file_loader.value is None:
+            pn.state.notifications.warning("No .imro file found - upload one before clicking this button.",
+                                    duration=10_000)
+            return
+        
+        file_extension = str(self.imro_file_loader.filename).split(".")[-1]
+        if file_extension != "imro":
+            pn.state.notifications.error(f"You must upload an .imro file, not .{file_extension}!",
+                                    duration=10_000)
             return
         
         imro_file_content = self.imro_file_loader.value
@@ -961,7 +968,7 @@ class ChannelmapGUI(param.Parameterized):
         )
 
         # IMRO file dropper
-        self.imro_file_loader = pn.widgets.FileInput(accept=".imro", width=300)
+        self.imro_file_loader = pn.widgets.FileInput(width=300)
         self.apply_uploaded_imro_button = pn.widgets.Button(
             name="Apply uploaded IMRO file to selection ⬆", button_type="primary", width=250
         )

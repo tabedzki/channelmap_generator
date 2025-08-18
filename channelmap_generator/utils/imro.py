@@ -6,9 +6,10 @@
 import numpy as np
 import pandas as pd
 
+import panel as pn
+
 from channelmap_generator.backend import format_imro_string, get_electrodes
 from channelmap_generator.constants import PROBE_N, PROBE_TYPE_MAP, REF_ELECTRODES
-
 
 def save_to_imro_file(imro_list, filename="channelmap.imro"):
     """
@@ -98,6 +99,7 @@ def parse_imro_list(imro_list):
                probe_type: "1.0", "2.0-1shank", "2.0-4shanks", or "NXT"
                Other parameters: as used in original generation
     """
+
     header = imro_list[0]
     probe_subtype = header[0]
     entries = imro_list[1:]
@@ -109,21 +111,21 @@ def parse_imro_list(imro_list):
         probe_type = "2.0-1shank"
     elif probe_subtype in PROBE_TYPE_MAP["2.0-4shanks"]:
         probe_type = "2.0-4shanks"
-    elif probe_subtype in PROBE_TYPE_MAP["NXT"]:
-        probe_type = "NXT"
+    # elif probe_subtype in PROBE_TYPE_MAP["NXT"]:
+    #     probe_type = "NXT"
 
     selected_electrodes = []
 
     if probe_type == "1.0":
         # Format: (channel, bank, ref, ap_gain, lf_gain, hp_filter)
+        check_entry_elements(6,  entries[0], probe_type)
+        
         reference_id = entries[0][2]  # Same for all entries
+        reference_string = ref_id_to_string(reference_id, probe_subtype)
+
         ap_gain = entries[0][3]
         lf_gain = entries[0][4]
         hp_filter = entries[0][5]
-
-        # Convert reference value back to string
-        ref_map = {v: k for k, v in REF_ELECTRODES[probe_subtype].items()}
-        reference_id = ref_map[reference_id]
 
         # Extract electrodes: channel + 384*bank gives electrode_id, shank is always 0
         for entry in entries:
@@ -133,34 +135,31 @@ def parse_imro_list(imro_list):
 
     elif probe_type == "2.0-1shank":
         # Format: (channel, bank_mask, ref, electrode_id)
-        reference_id = entries[0][2]
-        ap_gain = lf_gain = hp_filter = None  # Not used in 2.0
+        check_entry_elements(4,  entries[0], probe_type)
 
-        # Convert reference value back to string
-        ref_map = {v: k for k, v in REF_ELECTRODES[probe_subtype].items()}
-        reference_id = ref_map[reference_id]
+        reference_id = entries[0][2]
+        reference_string = ref_id_to_string(reference_id, probe_subtype)
+
+        ap_gain = lf_gain = hp_filter = None  # Not used in 2.0 IMRO tables
 
         # Extract electrodes: electrode_id is directly stored, shank is always 0
         for entry in entries:
             electrode_id = entry[3]
             selected_electrodes.append([0, electrode_id])
 
-    else:  # 2.0-4shanks or NXT
+    else:  # 2.0-4shanks or NXT in the future
         # Format: (channel, shank_id, bank, ref, electrode_id)
-        reference_id = entries[0][3]
-        ap_gain = lf_gain = hp_filter = None  # Not used in 2.0
+        check_entry_elements(5,  entries[0], probe_type)
 
-        # Convert reference value back to string
-        ref_electrodes = REF_ELECTRODES[probe_subtype]
-        if "Tip" in ref_electrodes and isinstance(ref_electrodes["Tip"], list):
-            if reference_id in ref_electrodes["Tip"]:
-                reference_id = "Tip"
-            else:
-                ref_map = {v: k for k, v in ref_electrodes.items() if k != "Tip"}
-                reference_id = ref_map[reference_id]
+        # Need the 2 first reference IDs to handle join_tips referencing
+        reference_ids = [entries[0][3], entries[1][3]]
+        if reference_ids[0] != reference_ids[1]:
+            reference_string = 'Join Tips'
         else:
-            ref_map = {v: k for k, v in ref_electrodes.items()}
-            reference_id = ref_map[reference_id]
+            reference_id = reference_ids[0]
+            reference_string = ref_id_to_string(reference_id, probe_subtype)
+
+        ap_gain = lf_gain = hp_filter = None  # Not used in 2.0 IMRO tables
 
         # Extract electrodes: shank_id and electrode_id are directly stored
         for entry in entries:
@@ -170,9 +169,29 @@ def parse_imro_list(imro_list):
 
     selected_electrodes = np.array(selected_electrodes, dtype=int)
 
-    return selected_electrodes, probe_type, probe_subtype, reference_id, ap_gain, lf_gain, hp_filter
+    return (selected_electrodes,
+            probe_type,
+            probe_subtype,
+            reference_string,
+            ap_gain,
+            lf_gain,
+            hp_filter)
 
 
+def ref_id_to_string(reference_id, probe_subtype):
+    ref_map = {v: k for k, v in REF_ELECTRODES[probe_subtype].items() if k != "Join Tips"}
+    if reference_id not in ref_map:
+        pn.state.notifications.error(f"Unexpected reference id {reference_id} for probe subtype {probe_subtype}!",
+                                    duration=10_000)
+    assert reference_id in ref_map,\
+            f"Unexpected reference id {reference_id} for probe subtype {probe_subtype}!"
+    return ref_map[reference_id]
+
+def check_entry_elements(n_expected_elements, entry, probe_type):
+    n_entry_elements = len(entry)
+    if n_entry_elements != n_expected_elements:
+        pn.state.notifications.error(f"Corrupt .imro file - IMRO table entries for {probe_type} probes should have {n_expected_elements} elements, not {n_entry_elements}.",
+                                duration=10_000)
 
 def generate_imro_channelmap(
     probe_type,
