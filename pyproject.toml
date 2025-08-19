@@ -52,8 +52,8 @@ include = ["channelmap_generator*"]
 [tool.setuptools.package-data]
 channelmap_generator = [
     "wiring_maps/*.csv",
-    "gui/*.png",
-    "gui/*.svg",
+    "gui/*/*.png",
+    "gui/*/*.svg",
     "example_layouts/*.pdf",
 ]
 

@@ -37,7 +37,7 @@ from channelmap_generator import __version__
 from channelmap_generator.constants import PROBE_N, PROBE_TYPE_MAP, SUPPORTED_1shank_PRESETS, SUPPORTED_4shanks_PRESETS, WIRING_FILE_MAP, REF_ELECTRODES
 from channelmap_generator.utils import imro
 from channelmap_generator.types import Electrode
-from .. import backend
+from channelmap_generator import backend
 
 # Paths to assets
 WIRING_MAPS_DIR = Path(__file__).resolve().parent.parent / "wiring_maps"
