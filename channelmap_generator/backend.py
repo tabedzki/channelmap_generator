@@ -198,7 +198,11 @@ def format_imro_string(electrodes, wiring_df, probe_type, probe_subtype, referen
 
     # Sort by channel and format
     entries.sort(key=lambda x: x[0])
-    entries = [(e[0], e[1], e[2], ref, e[3]) for e, ref in zip(entries, ref_values)]
+    
+    # Only apply ref_values formatting for 4-shank probes
+    if probe_type in ["2.0-4shanks", "NXT"]:
+        entries = [(e[0], e[1], e[2], ref, e[3]) for e, ref in zip(entries, ref_values)]
+    
     header = (probe_subtype, len(entries))
     imro_list = [header] + entries
 

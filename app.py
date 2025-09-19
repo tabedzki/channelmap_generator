@@ -20,4 +20,4 @@ print(f"Files in current directory: {os.listdir('.')}")
 
 # port = int(os.environ.get("PORT", 80))
 # pn.serve(app, port=port, address="0.0.0.0", allow_websocket_origin="*", show=False)
-app.servable()
+app.servable(title="Neuropixels Channelmap Generator")

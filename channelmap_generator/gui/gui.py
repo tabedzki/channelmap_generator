@@ -5,6 +5,7 @@ Using Bokeh for better interactivity with hover, click, and rectangular selectio
 """
 
 import re
+import gc
 import socket
 from io import BytesIO, StringIO
 from pathlib import Path
@@ -15,6 +16,10 @@ import numpy as np
 import pandas as pd
 import panel as pn
 import param
+
+import psutil
+import threading
+import time
 
 import logging
 from bokeh.util.logconfig import basicConfig
@@ -408,11 +413,12 @@ class ChannelmapGUI(param.Parameterized):
         """Update electrode colors in the Bokeh plot"""
         n_electrodes = len(self.electrode_source.data["shank_id"])
 
-        colors = []
-        alphas = []
-        line_colors = []
-        line_widths = []
-        statuses = []
+        # Pre-allocate numpy arrays for better memory efficiency
+        colors = np.empty(n_electrodes, dtype=object)
+        alphas = np.empty(n_electrodes, dtype=np.float64)
+        line_colors = np.empty(n_electrodes, dtype=object)
+        line_widths = np.empty(n_electrodes, dtype=np.int32)
+        statuses = np.empty(n_electrodes, dtype=object)
 
         for i in range(n_electrodes):
             shank_id = self.electrode_source.data["shank_id"][i]
@@ -421,15 +427,17 @@ class ChannelmapGUI(param.Parameterized):
 
             status, color, alpha, line_color, line_width = self.get_electrode_plotting_params(electrode)
 
-            colors.append(color)
-            alphas.append(alpha)
-            line_colors.append(line_color)
-            line_widths.append(line_width)
-            statuses.append(status)
+            colors[i] = color
+            alphas[i] = alpha
+            line_colors[i] = line_color
+            line_widths[i] = line_width
+            statuses[i] = status
 
-        # Update the data source
+        # Update the data source with new data, replacing old arrays
         self.electrode_source.data.update(
-            {"color": colors, "alpha": alphas, "line_color": line_colors, "line_width": line_widths, "status": statuses}
+            {"color": colors.tolist(), "alpha": alphas.tolist(), 
+             "line_color": line_colors.tolist(), "line_width": line_widths.tolist(), 
+             "status": statuses.tolist()}
         )
 
 
@@ -489,6 +497,10 @@ class ChannelmapGUI(param.Parameterized):
 
         # Clear the selection to allow for new interactions
         self.electrode_source.selected.indices = []
+        
+        # Force garbage collection after large selections to free memory
+        if len(new) > 100:
+            gc.collect()
 
 
     def get_zigzag_subset(self):
@@ -651,23 +663,29 @@ class ChannelmapGUI(param.Parameterized):
         # Create memory buffer
         buffer = BytesIO()
 
-        # Make figure
-        title = self.filename_input.value
-        backend.plot_probe_layout(
-            self.probe_type,
-            self.imro_list,
-            self.positions_file,
-            self.wiring_file,
-            title,
-            figsize=(2, 30),
-            save_plot=False,
-        )
+        try:
+            # Make figure
+            title = self.filename_input.value
+            backend.plot_probe_layout(
+                self.probe_type,
+                self.imro_list,
+                self.positions_file,
+                self.wiring_file,
+                title,
+                figsize=(2, 30),
+                save_plot=False,
+            )
 
-        # Save current figure to buffer
-        plt.savefig(buffer, format="pdf", dpi=300, bbox_inches="tight")
-        plt.close()
-
-        buffer.seek(0)
+            # Save current figure to buffer
+            plt.savefig(buffer, format="pdf", dpi=300, bbox_inches="tight")
+            buffer.seek(0)
+            
+        finally:
+            # Force cleanup of matplotlib resources
+            plt.close('all')  # Close all figures
+            plt.clf()         # Clear current figure
+            plt.cla()         # Clear current axes
+            
         return buffer
 
     def apply_uploaded_imro(self):
@@ -1123,12 +1141,29 @@ class ChannelmapGUI(param.Parameterized):
     ##### Probe version update #####
     ################################
 
+    def clear_bokeh_data(self):
+
+        # Clean up old plot resources before creating new ones
+        if hasattr(self, 'plot') and self.plot is not None:
+            # Clear all renderers and tools to prevent memory accumulation
+            self.plot.renderers.clear()
+            self.plot.toolbar.tools.clear()
+            
+        if hasattr(self, 'electrode_source') and self.electrode_source is not None:
+            # Clear data source
+            self.electrode_source.data.clear()
+            
+        if hasattr(self, 'tool_state_source') and self.tool_state_source is not None:
+            # Clear tool state source
+            self.tool_state_source.data.clear()
+
     @param.depends("probe_type", watch=True)
     def on_probe_type_change(self):
         """
         Handle probe type changes, which require to reset the whole plot.
         Param module monitors value changes of probe_type.
         """
+        self.clear_bokeh_data()
         self.load_probe_data()
         self.setup_bokeh_plot()
         self.update_electrode_counter()
@@ -1197,6 +1232,13 @@ def find_free_port(start_port=5007):
                 continue
     raise RuntimeError("No free ports found")
 
+def monitor_memory():
+    process = psutil.Process()
+    while True:
+        memory_mb = process.memory_info().rss / 1024 / 1024
+        print(f"Memory usage: {memory_mb:.1f} MB")
+        time.sleep(10)
+
 
 def create_app():
     """Create and configure the Panel app"""
@@ -1212,6 +1254,9 @@ def create_app():
 def main(show=True):
     # Create app
     app = create_app()
+
+    # Monitor potential memory leak
+    threading.Thread(target=monitor_memory, daemon=True).start()
 
     # Serve the app
     port = find_free_port(5003)
