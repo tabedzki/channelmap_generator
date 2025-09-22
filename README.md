@@ -24,9 +24,26 @@ git clone http://github.com/m-beau/channelmap_generator.git
 cd channelmap_generator
 ```
 
+### Using `uv` (Recommended)
+
+With `uv`, you can either install dependencies first and then run the application, or run it directly in one command:
+
+```bash
+uv sync # install dependencies
+uv run cmap_gui # install dependencies
+```
+
+Or run directly (installs dependencies automatically):
+
+```bash
+uv run cmap_gui  # This will automatically install dependencies if needed, and run the app.
+```
+
+This approach is particularly convenient as `uv` will automatically create a virtual environment, install all dependencies from `pyproject.toml`, and run the GUI in a single command.
+
 ### Install the package using pip
 
-For example, in a new conda environment:
+In this case, you must create a virtual environment yourself, e.g. a new conda environment:
 
 ```bash
 conda create -n my_environment python=3.12
@@ -35,25 +52,6 @@ uv pip install . # fast! run pip install uv first.
 # or traditionally with pip only:
 pip install .
 ```
-
-### Using `uv` (Recommended)
-
-With `uv`, you can either install dependencies first and then run the application, or run it directly in one command:
-
-Install dependencies, then run:
-
-```bash
-uv sync
-uv run cmap_gui
-```
-
-Or run directly (installs dependencies automatically):
-
-```bash
-uv run cmap_gui  # This will automatically install dependencies if needed
-```
-
-The second approach is particularly convenient as `uv` will automatically create a virtual environment, install all dependencies from `pyproject.toml`, and run the GUI in a single command.
 
 ### Run using Docker (Installation-free)
 
