@@ -6,7 +6,6 @@ Using Bokeh for better interactivity with hover, click, and rectangular selectio
 
 import re
 import gc
-import socket
 from io import BytesIO, StringIO
 from pathlib import Path
 from dataclasses import dataclass, field
@@ -16,10 +15,6 @@ import numpy as np
 import pandas as pd
 import panel as pn
 import param
-
-import psutil
-import threading
-import time
 
 import logging
 from bokeh.util.logconfig import basicConfig
@@ -1221,25 +1216,6 @@ class ChannelmapGUI(param.Parameterized):
 
 
 ## App creation utilities
-def find_free_port(start_port=5007):
-    """Find next available port starting from start_port"""
-    for port in range(start_port, start_port + 100):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            try:
-                s.bind(("localhost", port))
-                return port
-            except OSError:
-                continue
-    raise RuntimeError("No free ports found")
-
-def monitor_memory():
-    process = psutil.Process()
-    while True:
-        memory_mb = process.memory_info().rss / 1024 / 1024
-        print(f"Memory usage: {memory_mb:.1f} MB")
-        time.sleep(10)
-
-
 def create_app():
     """Create and configure the Panel app"""
     gui = ChannelmapGUI()
@@ -1249,15 +1225,3 @@ def create_app():
     gui.update_electrode_counter()
 
     return layout
-
-
-def main(show=True):
-    # Create app
-    app = create_app()
-
-    # Monitor potential memory leak
-    threading.Thread(target=monitor_memory, daemon=True).start()
-
-    # Serve the app
-    port = find_free_port(5003)
-    pn.serve(app, port=port, show=show, title="Neuropixels Channelmap Generator", verbose=True)

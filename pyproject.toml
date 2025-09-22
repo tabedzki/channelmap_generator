@@ -35,7 +35,7 @@ dependencies = [
 ]
 
 [project.gui-scripts]
-cmap_gui = "channelmap_generator.__main__:main_entry"
+cmap_gui = "channelmap_generator.gui.app_util:main"
 
 [project.urls]
 Homepage = "https://github.com/m-beau/channelmap-generator"
