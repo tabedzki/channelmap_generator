@@ -167,6 +167,27 @@ class ChannelmapGUI(param.Parameterized):
         # Create widgets
         self.create_widgets()
 
+        # Register cleanup on session destroy
+        if pn.state.curdoc:
+            pn.state.curdoc.on_session_destroyed(self._cleanup_session)
+
+    def _cleanup_session(self, session_context):
+        """Clean up resources when session ends"""
+
+        self.clear_bokeh_data()
+
+        if hasattr(self, 'electrode_source'):
+            del self.electrode_source
+        if hasattr(self, 'tool_state_source'):
+            del self.tool_state_source
+        if hasattr(self, 'plot'):
+            del self.plot
+        if hasattr(self, 'plot_pane'):
+            del self.plot_pane
+
+        gc.collect()
+        print(f"🧹🧹🧹 Session {session_context.id} cleaned up")
+
 
     #####################################
     ##### Probe geometry and wiring #####
@@ -493,9 +514,7 @@ class ChannelmapGUI(param.Parameterized):
         # Clear the selection to allow for new interactions
         self.electrode_source.selected.indices = []
         
-        # Force garbage collection after large selections to free memory
-        if len(new) > 100:
-            gc.collect()
+        gc.collect()
 
 
     def get_zigzag_subset(self):
@@ -676,10 +695,8 @@ class ChannelmapGUI(param.Parameterized):
             buffer.seek(0)
             
         finally:
-            # Force cleanup of matplotlib resources
-            plt.close('all')  # Close all figures
-            plt.clf()         # Clear current figure
-            plt.cla()         # Clear current axes
+            plt.close('all')
+            gc.collect()
             
         return buffer
 

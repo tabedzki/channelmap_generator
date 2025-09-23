@@ -18,4 +18,7 @@ exec uv run panel serve ./app.py \
     --port "$INTERNAL_PORT" \
     --allow-websocket-origin "$ALLOW_WEBSOCKET_ORIGIN" \
     --num-procs "$NUM_PROCS" \
+    --session-token-expiration 3600000 \
+    --check-unused-sessions 10000 \
+    --unused-session-lifetime 60000 \
     --show

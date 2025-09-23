@@ -37,9 +37,6 @@ def monitor_memory():
 
 
 def main(show=True, local=True):
-    # Create app
-    app = create_app()
-
     # Monitor potential memory leak
     monitor_memory()
 
@@ -47,10 +44,6 @@ def main(show=True, local=True):
     print("Starting app...")
     if local:
         port = find_free_port(5003)
-        pn.serve(app, port=port, show=show, title="Neuropixels Channelmap Generator", verbose=True)
+        pn.serve(create_app, port=port, show=show, title="Neuropixels Channelmap Generator", verbose=True)
     else:
-        app.servable(title="Neuropixels Channelmap Generator")
-
-
-if __name__ == "__main__":
-    main(show=True, local=True)
+        create_app().servable(title="Neuropixels Channelmap Generator")
