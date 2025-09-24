@@ -38,7 +38,7 @@ def monitor_memory():
 
 def main(show=True, local=True):
     # Monitor potential memory leak
-    monitor_memory()
+    # monitor_memory()
 
     # Serve the app
     print("Starting app...")
