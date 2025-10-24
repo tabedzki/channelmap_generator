@@ -1,4 +1,4 @@
-# Channelmap Generator for Neuropixels Probes </h1> <img src="https://raw.githubusercontent.com/m-beau/channelmap_generator/main/channelmap_generator/gui/assets/npix_map_logo.svg" width="150" title="Neuropyxels" alt="Neuropixels" align="right" vspace = "50">
+# Channelmap Generator for Neuropixels Probes </h1> <img src="https://raw.githubusercontent.com/m-beau/channelmap_generator/main/channelmap_generator/gui/assets/npix_map_logo.svg" width="150" align="right" vspace = "0">
 
 ⚡ Generate channel maps for Neuropixels probes that respect electrode-ADC wiring constraints! ⚡
 
