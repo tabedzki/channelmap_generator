@@ -78,7 +78,7 @@ cmap_gui  # Alias for: python ./channelmap_generator/gui/gui.py
 Neuropixels electrodes are [hardwired](https://www.neuropixels.org/support) to specific ADCs in the probe's head. When you select an electrode, others become unavailable because they share the same recording lines. This GUI allows you to build a channelmap around those constraints: when you select channels, they turn **red**, and those that become unavailable because they share the same lines turn **black**.
 
 > [!WARNING]
-> If SpikeGLX seems to ignore the .imro file when you try to load it, make sure that the <span style="color: magenta;">probe subtype</span> is correct.
+> If SpikeGLX seems to ignore the `.imro` file when you try to load it, make sure that the <span style="color: magenta;">probe subtype</span> is correct.
 > You can find the subtype as the **first number of the first tuple of the probe's imro table**, either in the default `.imro` file made by SpikeGLX (save it to file though the IM setup tab), or in the `.meta` file saved alongside any recording from that probe (~imroTbl field, the last field of the file).
 
 You can mix and match four selection methods:\
@@ -130,7 +130,7 @@ Reloading the page should fix most issues. If you have crappy network on your ma
 If SpikeGLX seems to ignore the `.imro` file when you try to load it, make sure that the <span style="color: magenta;">probe subtype</span> is correct. You can find the subtype as the **first number of the first tuple of the probe's imro table**, either in the default `.imro` file made by SpikeGLX (save it to file though the IM setup tab), or in the `.meta` file saved alongside any recording from that probe (~imroTbl field, the last field of the file).
 
 <span style="color: orange;">After loading the `.imro` file, SpikeGLX IMRO editing options become greyed out!</span><br>
-This is expected behavior for non-canonical IMRO tables. SpikeGLX greys out editing features for imported tables that don't match its canonical format (being whole/half-shank width boxes that enclose all AP channels with attributes for all channels). This allows SpikeGLX to use external tables "as is" without knowing how to modify them safely. If you need to make adjustments, use the [online gui](https://neuropixels-channelmap-generator.pni.princeton.edu) again: upload your .imro file as a starting point, then modify your .imro table before re-downlading it and re-importing into SpikeGLX.
+This is expected behavior for non-canonical IMRO tables. SpikeGLX greys out editing features for imported tables that don't match its canonical format (being whole/half-shank width boxes that enclose all AP channels with attributes for all channels). This allows SpikeGLX to use external tables "as is" without knowing how to modify them safely. If you need to make adjustments, use the [online gui](https://neuropixels-channelmap-generator.pni.princeton.edu) again: upload your `.imro`file as a starting point, then modify your `.imro`table before re-downlading it and re-importing into SpikeGLX.
 
 
 # Roadmap
