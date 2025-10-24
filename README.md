@@ -5,14 +5,14 @@
 <div align="center"> <a href="https://neuropixels-channelmap-generator.pni.princeton.edu">>>> Online GUI <<<</a> </div><br>
 
 Purpose of this <ins>tool</ins>:
-- Convenient browser-based <span style="color: magenta;">generation of `.imro` files for SpikeGLX</span>.
+- Convenient browser-based <ins>generation of `.imro` files for SpikeGLX</ins>.
     - [IMRO tables](https://billkarsh.github.io/SpikeGLX/help/imroTables/) are used to tell SpikeGLX what channels to record from (Neuropixels feature more physical electrodes than can be recorded from simultaneously); what reference to use; and sometimes recording amplification gain (1.0 only).
 - Enables **arbitrary selection of electrode geometries**, within the boundaries of Neuropixels electrode-ADC hardware wiring constraints
 - Common **presets** available out of the box (reach out to suggest other common geometries!)
 - Option to **load pre-existing `.imro` file** as starting point (or simply to remember the probe geometry of a specific file)
 
 
-**Disclaimer**: this tool is in <span style="color: magenta;">beta</span> release and should be considered a work in progress, deployed early to gather feedback. The imro editor tools in SpikeGLX and Open Ephys work correctly. What we are providing here are tools to specify imro tables more easily and conveniently. However, it will take some time to debug all the issues in this beta. If you import one of our tables into SpikeGLX or Open Ephys, please be sure to double check that all the site selections, referencing, gains, and filter settings that get imported are what you intended.
+**Disclaimer**: this tool is in <ins>beta</ins> release and should be considered a work in progress, deployed early to gather feedback. The imro editor tools in SpikeGLX and Open Ephys work correctly. What we are providing here are tools to specify imro tables more easily and conveniently. However, it will take some time to debug all the issues in this beta. If you import one of our tables into SpikeGLX or Open Ephys, please be sure to double check that all the site selections, referencing, gains, and filter settings that get imported are what you intended.
 
 # Local installation
 
@@ -78,7 +78,7 @@ cmap_gui  # Alias for: python ./channelmap_generator/gui/gui.py
 Neuropixels electrodes are [hardwired](https://www.neuropixels.org/support) to specific ADCs in the probe's head. When you select an electrode, others become unavailable because they share the same recording lines. This GUI allows you to build a channelmap around those constraints: when you select channels, they turn **red**, and those that become unavailable because they share the same lines turn **black**.
 
 > [!WARNING]
-> If SpikeGLX seems to ignore the `.imro` file when you try to load it, make sure that the <span style="color: magenta;">probe subtype</span> is correct.
+> If SpikeGLX seems to ignore the `.imro` file when you try to load it, make sure that the <ins>probe subtype</ins> is correct.
 > You can find the subtype as the **first number of the first tuple of the probe's imro table**, either in the default `.imro` file made by SpikeGLX (save it to file though the IM setup tab), or in the `.meta` file saved alongside any recording from that probe (~imroTbl field, the last field of the file).
 
 You can mix and match four selection methods:\
@@ -123,13 +123,13 @@ Like you would with any `.imro` file (see [SpikeGLX documentation](https://billk
 
 # Troubleshooting
 
-<span style="color: orange;">The online GUI is unresponsive!</span><br>
+<span style="color: orange;">The online GUI is unresponsive!</ins><br>
 Reloading the page should fix most issues. If you have crappy network on your machine, consider installing it locally (see installation section above).
 
-<span style="color: orange;">SpikeGLX ignores my `.imro` file upon upload!</span><br>
-If SpikeGLX seems to ignore the `.imro` file when you try to load it, make sure that the <span style="color: magenta;">probe subtype</span> is correct. You can find the subtype as the **first number of the first tuple of the probe's imro table**, either in the default `.imro` file made by SpikeGLX (save it to file though the IM setup tab), or in the `.meta` file saved alongside any recording from that probe (~imroTbl field, the last field of the file).
+<span style="color: orange;">SpikeGLX ignores my `.imro` file upon upload!</ins><br>
+If SpikeGLX seems to ignore the `.imro` file when you try to load it, make sure that the <ins>probe subtype</ins> is correct. You can find the subtype as the **first number of the first tuple of the probe's imro table**, either in the default `.imro` file made by SpikeGLX (save it to file though the IM setup tab), or in the `.meta` file saved alongside any recording from that probe (~imroTbl field, the last field of the file).
 
-<span style="color: orange;">After loading the `.imro` file, SpikeGLX IMRO editing options become greyed out!</span><br>
+<span style="color: orange;">After loading the `.imro` file, SpikeGLX IMRO editing options become greyed out!</ins><br>
 This is expected behavior for non-canonical IMRO tables. SpikeGLX greys out editing features for imported tables that don't match its canonical format (being whole/half-shank width boxes that enclose all AP channels with attributes for all channels). This allows SpikeGLX to use external tables "as is" without knowing how to modify them safely. If you need to make adjustments, use the [online gui](https://neuropixels-channelmap-generator.pni.princeton.edu) again: upload your `.imro`file as a starting point, then modify your `.imro`table before re-downlading it and re-importing into SpikeGLX.
 
 
