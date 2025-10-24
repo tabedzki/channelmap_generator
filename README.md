@@ -7,9 +7,9 @@
 Purpose of this tool:
 - Convenient browser-based <ins>generation of `.imro` files for SpikeGLX</ins>.
     - [IMRO tables](https://billkarsh.github.io/SpikeGLX/help/imroTables/) are used to tell SpikeGLX what channels to record from (Neuropixels feature more physical electrodes than can be recorded from simultaneously); what reference to use; and sometimes recording amplification gain (1.0 only).
-- Enables **arbitrary selection of electrode geometries**, within the boundaries of Neuropixels electrode-ADC hardware wiring constraints
-- Common **presets** available out of the box (reach out to suggest other common geometries!)
-- Option to **load pre-existing `.imro` file** as starting point (or simply to remember the probe geometry of a specific file)
+- Enables <ins>arbitrary selection of electrode geometries</ins>, within the boundaries of Neuropixels electrode-ADC hardware wiring constraints
+- Common <ins>presets</ins> available out of the box (reach out to suggest other common geometries!)
+- Option to <ins>load pre-existing `.imro` file</ins> as starting point (or simply to remember the probe geometry of a specific file)
 
 
 **Disclaimer**: this tool is in <ins>beta</ins> release and should be considered a work in progress, deployed early to gather feedback. The imro editor tools in SpikeGLX and Open Ephys work correctly. What we are providing here are tools to specify imro tables more easily and conveniently. However, it will take some time to debug all the issues in this beta. If you import one of our tables into SpikeGLX or Open Ephys, please be sure to double check that all the site selections, referencing, gains, and filter settings that get imported are what you intended.
