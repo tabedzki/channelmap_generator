@@ -4,7 +4,7 @@
 
 <div align="center"> <a href="https://neuropixels-channelmap-generator.pni.princeton.edu">>>> Online GUI <<<</a> </div><br>
 
-Purpose of this <ins>tool</ins>:
+Purpose of this tool:
 - Convenient browser-based <ins>generation of `.imro` files for SpikeGLX</ins>.
     - [IMRO tables](https://billkarsh.github.io/SpikeGLX/help/imroTables/) are used to tell SpikeGLX what channels to record from (Neuropixels feature more physical electrodes than can be recorded from simultaneously); what reference to use; and sometimes recording amplification gain (1.0 only).
 - Enables **arbitrary selection of electrode geometries**, within the boundaries of Neuropixels electrode-ADC hardware wiring constraints
@@ -123,13 +123,13 @@ Like you would with any `.imro` file (see [SpikeGLX documentation](https://billk
 
 # Troubleshooting
 
-<span style="color: orange;">The online GUI is unresponsive!</ins><br>
+<ins>The online GUI is unresponsive!</ins><br>
 Reloading the page should fix most issues. If you have crappy network on your machine, consider installing it locally (see installation section above).
 
-<span style="color: orange;">SpikeGLX ignores my `.imro` file upon upload!</ins><br>
+<ins>SpikeGLX ignores my `.imro` file upon upload!</ins><br>
 If SpikeGLX seems to ignore the `.imro` file when you try to load it, make sure that the <ins>probe subtype</ins> is correct. You can find the subtype as the **first number of the first tuple of the probe's imro table**, either in the default `.imro` file made by SpikeGLX (save it to file though the IM setup tab), or in the `.meta` file saved alongside any recording from that probe (~imroTbl field, the last field of the file).
 
-<span style="color: orange;">After loading the `.imro` file, SpikeGLX IMRO editing options become greyed out!</ins><br>
+<ins>After loading the `.imro` file, SpikeGLX IMRO editing options become greyed out!</ins><br>
 This is expected behavior for non-canonical IMRO tables. SpikeGLX greys out editing features for imported tables that don't match its canonical format (being whole/half-shank width boxes that enclose all AP channels with attributes for all channels). This allows SpikeGLX to use external tables "as is" without knowing how to modify them safely. If you need to make adjustments, use the [online gui](https://neuropixels-channelmap-generator.pni.princeton.edu) again: upload your `.imro`file as a starting point, then modify your `.imro`table before re-downlading it and re-importing into SpikeGLX.
 
 
