@@ -4,7 +4,7 @@
 
 <div align="center"> <a href="https://neuropixels-channelmap-generator.pni.princeton.edu">>>> Online GUI <<<</a> </div><br>
 
-Purpose of this tool:
+Purpose of this <ins>tool</ins>:
 - Convenient browser-based <span style="color: magenta;">generation of `.imro` files for SpikeGLX</span>.
     - [IMRO tables](https://billkarsh.github.io/SpikeGLX/help/imroTables/) are used to tell SpikeGLX what channels to record from (Neuropixels feature more physical electrodes than can be recorded from simultaneously); what reference to use; and sometimes recording amplification gain (1.0 only).
 - Enables **arbitrary selection of electrode geometries**, within the boundaries of Neuropixels electrode-ADC hardware wiring constraints
