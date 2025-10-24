@@ -393,7 +393,7 @@ class ChannelmapGUI(param.Parameterized):
                 # Shank label
                 self.plot.text(
                     [x_center],
-                    [min_y - tip_height - 100],
+                    [min_y - tip_height - 250],
                     text=[f"Shank {shank_id}"],
                     text_font_size="12pt",
                     text_color="black",
@@ -1046,7 +1046,7 @@ class ChannelmapGUI(param.Parameterized):
         """Create the main Panel layout"""
 
         # Counter and Downloader (fixed on the right)
-        downloader = pn.Column(
+        counter_downloader = pn.Column(
             pn.Column(
                 self.electrode_counter,
                 self.clear_button,
@@ -1055,6 +1055,34 @@ class ChannelmapGUI(param.Parameterized):
             pn.pane.Markdown("## Export IMRO table", margin=(10, 0, -5, 30)),
             self.filename_input,
             self.get_download_buttons,
+
+            pn.pane.Markdown("## Instructions", margin=(10, 0, -5, 10)),
+            pn.pane.HTML("""
+            <div style="font-size: 13px; line-height: 1.4; text-align: justify;">
+            <b>Neuropixels hardware Constraints:</b><br>
+            Neuropixels electrodes are <a href='https://www.neuropixels.org/support' target='_blank'>hardwired</a> to specific ADCs in the probe's head. When you select an electrode, others become unavailable because they share the same recording lines.
+            This GUI allows you to build a channelmap around those constraints: when you select channels, they turn <font color="#c00000"><b>red</b></font>, and those that become unavailable because they share the same lines turn <b>black</b>.<br><br>
+
+            <b>You can mix and match four selection methods:</b><br>
+            • <b>Presets:</b> Pre-configured channelmaps that respect wiring constraints<br>
+            • <b>Textual selection:</b> Type electrode ranges (e.g., "1-10,20-25") to add to the current selection<br>
+            • <b>Interactive:</b> Click electrodes directly or drag boxes (selection, deselection, or "zigzag selection") to maually select multiple sites<br>
+            • <b>Selection from pre-existing IMRO file</b>: you can pre-load an IMRO file as a starting point before doing any of the above.<br><br>
+
+            Once you reach the <b>target number of electrodes</b> for the selected probe type (384 or 1536), you can <b>download your channelmap</b> as an IMRO file alongside a PDF rendering to easily remember what your channelmap looks like.
+            </div>
+            """),
+
+            styles={
+                "position": "fixed",
+                "top": "0px",
+                "right": "0px",
+                "height": "100vh",
+                "overflow-y": "auto",
+                "z-index": "1000",
+            },
+            width=350,
+            scroll=False,
         )
 
         # Controls panel (fixed on left)
@@ -1100,23 +1128,6 @@ class ChannelmapGUI(param.Parameterized):
             self.imro_file_loader,
             # pn.Spacer(height=30),
             self.apply_uploaded_imro_button,
-
-            pn.pane.Markdown("## Instructions", margin=(10, 0, -5, 10)),
-            pn.pane.HTML("""
-            <div style="font-size: 13px; line-height: 1.4; text-align: justify;">
-            <b>Neuropixels hardware Constraints:</b><br>
-            Neuropixels electrodes are <a href='https://www.neuropixels.org/support' target='_blank'>hardwired</a> to specific ADCs in the probe's head. When you select an electrode, others become unavailable because they share the same recording lines.
-            This GUI allows you to build a channelmap around those constraints: when you select channels, they turn <font color="#c00000"><b>red</b></font>, and those that become unavailable because they share the same lines turn <b>black</b>.<br><br>
-
-            <b>You can mix and match four selection methods:</b><br>
-            • <b>Presets:</b> Pre-configured channelmaps that respect wiring constraints<br>
-            • <b>Textual selection:</b> Type electrode ranges (e.g., "1-10,20-25") to add to the current selection<br>
-            • <b>Interactive:</b> Click electrodes directly or drag boxes (selection, deselection, or "zigzag selection") to maually select multiple sites<br>
-            • <b>Selection from pre-existing IMRO file</b>: you can pre-load an IMRO file as a starting point before doing any of the above.<br><br>
-
-            Once you reach the <b>target number of electrodes</b> for the selected probe type (384 or 1536), you can <b>download your channelmap</b> as an IMRO file alongside a PDF rendering to easily remember what your channelmap looks like.
-            </div>
-            """),
             styles={
                 "position": "fixed",
                 "top": "0px",
@@ -1141,9 +1152,9 @@ class ChannelmapGUI(param.Parameterized):
 
         layout = pn.Row(
             controls,
-            pn.Spacer(width=370),  # Slightly wider than controls (350 + margin)
+            pn.Spacer(width=370),  # Spacer for fixed controls panel on left
             plot_container,
-            downloader,
+            counter_downloader,
             sizing_mode="fixed",
         )
 
