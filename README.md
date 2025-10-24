@@ -77,7 +77,7 @@ cmap_gui  # Alias for: python ./channelmap_generator/gui/gui.py
 
 Neuropixels electrodes are [hardwired](https://www.neuropixels.org/support) to specific ADCs in the probe's head. When you select an electrode, others become unavailable because they share the same recording lines. This GUI allows you to build a channelmap around those constraints: when you select channels, they turn **red**, and those that become unavailable because they share the same lines turn **black**.
 
-> [!CAUTION] probe subtype
+> [!WARNING]
 > If SpikeGLX seems to ignore the .imro file when you try to load it, make sure that the <span style="color: magenta;">probe subtype</span> is correct.
 > You can find the subtype as the **first number of the first tuple of the probe's imro table**, either in the default `.imro` file made by SpikeGLX (save it to file though the IM setup tab), or in the `.meta` file saved alongside any recording from that probe (~imroTbl field, the last field of the file).
 
