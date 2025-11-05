@@ -1056,7 +1056,7 @@ class ChannelmapGUI(param.Parameterized):
             self.filename_input,
             self.get_download_buttons,
 
-            pn.pane.Markdown("## Instructions", margin=(10, 0, -5, 10)),
+            pn.pane.Markdown("## PixelMap instructions", margin=(10, 0, -5, 10)),
             pn.pane.HTML("""
             <div style="font-size: 13px; line-height: 1.4; text-align: justify;">
             <b>Neuropixels hardware Constraints:</b><br>

@@ -1,10 +1,10 @@
-# Channelmap Generator for Neuropixels Probes </h1> <img src="https://raw.githubusercontent.com/m-beau/channelmap_generator/main/channelmap_generator/gui/assets/npix_map_logo.png" width="150" align="right" vspace = "0">
+# PixelMap: a browser-based GUI to generate Neuropixels channelmaps </h1> <img src="https://raw.githubusercontent.com/m-beau/channelmap_generator/main/channelmap_generator/gui/assets/npix_map_logo.png" width="150" align="right" vspace = "0">
 
 <div align="center"> ⚡ Generate IMRO channelmaps for Neuropixels probes ⚡<br>⚡ that respect electrode-ADC wiring constraints! ⚡</div>
 
 <div align="center"> <a href="https://neuropixels-channelmap-generator.pni.princeton.edu">>>> Online GUI <<<</a> </div><br>
 
-Purpose of this tool:
+Purpose of PixelMap:
 - Convenient browser-based <ins>generation of `.imro` files for SpikeGLX</ins>.
     - [IMRO tables](https://billkarsh.github.io/SpikeGLX/help/imroTables/) are used to tell SpikeGLX what channels to record from (Neuropixels feature more physical electrodes than can be recorded from simultaneously); what reference to use; and sometimes recording amplification gain (1.0 only).
 - Enables <ins>arbitrary selection of electrode geometries</ins>, within the boundaries of Neuropixels electrode-ADC hardware wiring constraints
