@@ -26,7 +26,7 @@ PixelMap addresses these needs by:
 | Neuropixels 1.0 | 960 | 384 |
 | Neuropixels 2.0 (single shank) | 1,280 | 384 |
 | Neuropixels 2.0 (4-shank) | 5,120 (1,280 per shank) | 384 |
-| Neuropixels 2.0 Quad Base | 5,120 (1,280 per shank) | 1536 |
+| Neuropixels 2.0 Quad Base | 5,120 (1,280 per shank) | 1,536 |
 
 **Table 1: Number of physical and simultaneously addressable electrodes across Neuropixels probe versions.**
 
@@ -40,7 +40,7 @@ Second, the **core logic** at `./backend.py` implements the constraint-checking 
 
 Finally, the **graphical user interface** at `./gui/gui.py` was built with Holoviz' Panel. The interface provides real-time visualisation of the probe layout with electrode colour-coded based on their selection state (available in grey, selected in red, or unavailable in black). The interface supports the abovementioned four selection modes, including bokeh-based interactive click-selection and box-selection to select or deselect electrodes. User interactions trigger immediate recalculation of available electrodes based on the current selection state. This design ensures users receive instant feedback about constraint violations, preventing invalid configurations before file generation.
 
-![Figure 1](figure1.png)
+![Figure 1](Figure1.png)
 
 **Figure 1: PixelMap's browser-based graphical user interface**  
 **Center:** Main panel featuring the probe's physical layout with one or four shanks that exhibit the 960/shank (1.0) or 1280/shank (2.0) physical electrodes to be selected. Electrodes available for selection are light grey, selected electrodes turn red, and electrodes that become unavailable due to hardware wiring constraints turn black. In this example, 384 electrodes have been selected (matching the maximum simultaneous recording capacity), with a distributed pattern across multiple banks, illustrating that PixelMap allows selection of arbitrary channelmap geometries.<br>
