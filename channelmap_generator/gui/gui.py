@@ -1074,12 +1074,12 @@ class ChannelmapGUI(param.Parameterized):
             """),
 
             styles={
-                "position": "fixed",
+                "position": "sticky",
                 "top": "0px",
-                "right": "0px",
                 "height": "100vh",
                 "overflow-y": "auto",
-                "z-index": "1000",
+                "background": "white",
+                "border-left": "1px solid #ddd",
             },
             width=350,
             scroll=False,
