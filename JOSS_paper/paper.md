@@ -42,10 +42,10 @@ Finally, the **graphical user interface** at `./gui/gui.py` was built with Holov
 
 ![Figure 1](Figure1.png)
 
-**Figure 1: PixelMap's browser-based graphical user interface**  
-**Center:** Main panel featuring the probe's physical layout with one or four shanks that exhibit the 960/shank (1.0) or 1280/shank (2.0) physical electrodes to be selected. Electrodes available for selection are light grey, selected electrodes turn red, and electrodes that become unavailable due to hardware wiring constraints turn black. In this example, 384 electrodes have been selected (matching the maximum simultaneous recording capacity), with a distributed pattern across multiple banks, illustrating that PixelMap allows selection of arbitrary channelmap geometries.<br>
-**Left:** panel to input probe metadata (also part of `.imro` files) as well as three methods of electrode selection: preset geometries, manual textual input of electrode ranges, and pre-loading an existing `.imro` file. These three methods of electrode selection can be mixed together with an interactive click-and-drag box selector and deselector.<br>
-**Right:** electrode status indicator that turns green to confirm the selection is complete and is ready for IMRO file generation. Users can export their configuration via the "Download IMRO" button for direct use in SpikeGLX or save a PDF visualization to easily remember the geometry of the corresponding `.imro` file in the future. Below the status indicator are PixelMap's instructions.
+> **Figure 1: PixelMap's browser-based graphical user interface**  
+> **Center:** Main panel featuring the probe's physical layout with one or four shanks that exhibit the 960/shank (1.0) or 1280/shank (2.0) physical electrodes to be selected. Electrodes available for selection are light grey, selected electrodes turn red, and electrodes that become unavailable due to hardware wiring constraints turn black. In this example, 384 electrodes have been selected (matching the maximum simultaneous recording capacity), with a distributed pattern across multiple banks, illustrating that PixelMap allows selection of arbitrary channelmap geometries.<br>
+> **Left:** panel to input probe metadata (also part of `.imro` files) as well as three methods of electrode selection: preset geometries, manual textual input of electrode ranges, and pre-loading an existing `.imro` file. These three methods of electrode selection can be mixed together with an interactive click-and-drag box selector and deselector.<br>
+> **Right:** electrode status indicator that turns green to confirm the selection is complete and is ready for IMRO file generation. Users can export their configuration via the "Download IMRO" button for direct use in SpikeGLX or save a PDF visualization to easily remember the geometry of the corresponding `.imro` file in the future. Below the status indicator are PixelMap's instructions.
 
 ## Installation and Usage
 
