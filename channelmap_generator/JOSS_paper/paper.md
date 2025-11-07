@@ -1,0 +1,82 @@
+# PixelMap: An Application for Flexible Electrode Selection on Neuropixels Probes
+
+Maxime Beau<sup>1,2</sup>, Christian Tabedzki<sup>1</sup>, Carlos Brody<sup>1,2</sup>
+
+1: Princeton Neuroscience Institute, Princeton University, USA  
+2: Howard Hughes Medical Institute, USA
+
+## Abstract
+
+PixelMap is a browser-based application for creating custom channel maps for Neuropixels probes that respect electrode wiring constraints. Neuropixels probes, widely used for high-density neural recordings, possess more physical electrodes than can be used for simultaneous recording because they contain fewer analogue-to-digital converters (ADCs) than data lines. Each ADC is hard-wired to several electrodes, creating complex interdependencies where selecting one electrode makes others unavailable. Our application provides an installation-free, browser-based interface for researchers to design arbitrary recording configurations that meet their experimental requirement while satisfying these hardware constraints. The tool generates IMRO (IMec Read Out) files compatible with SpikeGLX, the most common data acquisition software for Neuropixels recordings.
+
+## Statement of need
+
+Neuropixels probes have revolutionised systems neuroscience by enabling simultaneous recordings from hundreds of neurons at spike resolution across multiple brain regions at any depth (Jun et al., 2017; Beau et al., 2021; Steinmetz et al., 2021; Bondy et al., 2024; Ye et al., 2025; Beau et al., 2025). However, configuring these probes for successful recording of neural data presents challenges. Neuropixels probes fit 960 to 5120 electrodes but can only record from 384 or 1536 channels simultaneously (Table 1), limited by the number of integrated analogue-to-digital converters (ADCs). The electrode-to-ADC wiring map follows complex patterns that vary with each Neuropixels version, making manual channel selection error-prone and time-consuming.
+
+While existing tools like SpikeGLX and Open Ephys provide tools to edit channelmap as .imro files, they require desktop apps, thus lack user-friendliness, and do not allow selection of fully arbitrary electrode geometries. Researchers often need custom channel configurations to target specific brain regions or optimise spatial sampling, but creating these configurations manually requires a deep understanding of the probe's wiring architecture and careful verification to avoid wiring violations.
+
+PixelMap addresses these needs by:
+
+1. **Being available on any machine installation-free**: The tool is available as a web application at https://pixelmap.pni.princeton.edu but can also be installed locally as a Python package.
+2. **Visualising wiring constraints interactively**: When users select electrodes, the interface immediately shows which other electrodes become unavailable (marked in black) due to shared ADC lines, preventing invalid configurations.
+3. **Supporting arbitrary electrode geometries**: Users can select electrodes through (i) picking from presets for common geometries, (ii) textually typing electrode ranges, enabling repeatable selection, (iii) dragging selection boxes and clicking on the probe visualisation itself, and (iv) loading pre-existing .imro files. These four selection methods are intercompatible so can be used together. For instance, a SpikeGLX .imro file can be loaded as a starting point, and selection boxes used to further refine the channelmap geometry.
+
+| Probe Version | Physical Channels | Simultaneously Recordable Channels |
+|---------------|-------------------|-------------------------------------|
+| Neuropixels 1.0 | 960 | 384 |
+| Neuropixels 2.0 (single shank) | 1,280 | 384 |
+| Neuropixels 2.0 (4-shank) | 5,120 (1,280 per shank) | 384 total |
+| Neuropixels Ultra (quad-base) | 5,120 (1,280 per shank) | 1536 total |
+
+**Table 1: Number of physical and simultaneously addressable electrodes across Neuropixels probe versions.**
+
+## Implementation
+
+The Channelmap Generator is implemented in Python using Holoviz' Panel (Yang et al., 2022) for the web interface, providing an interactive and responsive user experience. The software architecture consists of three main components.
+
+First, the **wiring maps** at `./wiring_maps/*.csv` are custom CSV files describing the electrode-to-ADC mappings for each supported probe type. They were built from files provided by IMEC (Neuropixels manufacturer).
+
+Second, the **core logic** at `./backend.py` implements the constraint-checking algorithms that validate electrode selections against probe-specific wiring maps. This handles the complex mapping between physical electrodes and ADC channels for different probe types (Neuropixels 1.0, 2.0 single-shank, and 2.0 four-shank so far). Hash tables (Python dictionaries) are used to query incompatible electrode pairs with O(1) complexity and improve performance.
+
+Finally, the **graphical user interface** at `./gui/gui.py` was built with Holoviz' Panel. The interface provides real-time visualisation of the probe layout with electrode colour-coded based on their selection state (available, selected, or blocked). The interface supports the abovementioned four selection modes, including bokeh-based interactive click-selection and box-selection to select or deselect electrodes. User interactions trigger immediate recalculation of available electrodes based on the current selection state. This design ensures users receive instant feedback about constraint violations, preventing invalid configurations before file generation.
+
+![**Figure 1: PixelMap's browser-based graphical user interface**  
+**Center:** Main panel featuring the probe's physical layout with one or four shanks that exhibit the 960 (1.0) or 1280 (2.0) physical electrodes to be selected. Electrodes available for selection are light grey, selected electrodes turn red, and electrodes that become unavailable due to hardware wiring constraints turn black. In this example, 384 electrodes have been selected (matching the maximum simultaneous recording capacity), with a distributed pattern across multiple banks, illustrating that PixelMap allows selection of arbitrary channelmap geometries.  
+**Left:** panel to input probe metadata as well as three methods of electrode selection: preset geometries, manual textual input of electrode ranges, and pre-loading an existing .imro file. These three methods of electrode selection can be mixed together with an interactive click-and-drag box selector and deselector.  
+**Right:** electrode status indicator, here green, that confirms the selection is complete and ready for IMRO file generation. Users can export their configuration via the "Download IMRO" button for direct use in SpikeGLX or save a PDF visualization for reference. Below are PixelMap's instructions.](figure1.png)
+
+## Installation and Usage
+
+PixelMap can be used through:
+
+1. **Web application**: Available at https://pixelmap.pni.princeton.edu for immediate use without installation.
+2. **Local installation**: Via pip (`pip install .`) or uv (`uv run cmap_gui`) from the GitHub repository.
+3. **Docker container**: Users can download the image used for the website and run the container locally.
+4. **Programmatic API**: Python scripts can directly call `.utils.imro.generate_imro_channelmap()` for batch processing or integration into analysis pipelines.
+
+## Author Contributions
+
+**Conceptualisation:** M.B.  
+**Backend and GUI:** M.B.  
+**App hosting:** C.T.  
+**Supervision and funding:** C.B.
+
+## Acknowledgements
+
+We thank the Princeton Neuroscience Institute for hosting the web application. We thank Jesse C. Kaminsky, Jorge Yanar, Julie Fabre, and members of the Brody laboratory for testing and feedback during development, and PNI IT members Garrett McGrath and Gary Lyons for their advice concerning hosting. This work was supported by Howard Hugh Medical Institute and the National Institute of Health.
+
+## References
+
+Beau, M., D'Agostino, F., Lajko, A., Martínez, G., Häusser, M., & Kostadinov, D. (2021). NeuroPyxels: Loading, processing and plotting Neuropixels data in Python. *Zenodo*. https://doi.org/10.5281/zenodo.5509733
+
+Beau, M., Herzfeld, D. J., Naveros, F., Hemelt, M. E., D'Agostino, F., Oostland, M., Sánchez-López, A., Chung, Y. Y., Maibach, M., Kyranakis, S., Stabb, H. N., Martínez Lopera, M. G., Lajko, A., Zedler, M., Ohmae, S., Hall, N. J., Clark, B. A., Cohen, D., Lisberger, S. G., … Medina, J. F. (2025). A deep learning strategy to identify cell types across species from high-density extracellular recordings. *Cell*, *188*(8), 2218-2234.e22. https://doi.org/10.1016/j.cell.2025.01.041
+
+Bondy, A. G., Charlton, J. A., Luo, T. Z., Kopec, C. D., Stagnaro, W. M., Venditto, S. J. C., Lynch, L., Janarthanan, S., Oline, S. N., Harris, T. D., & Brody, C. D. (2024). Coordinated cross-brain activity during accumulation of sensory evidence and decision commitment (p. 2024.08.21.609044). *bioRxiv*. https://doi.org/10.1101/2024.08.21.609044
+
+Jun, J. J., Steinmetz, N. A., Siegle, J. H., Denman, D. J., Bauza, M., Barbarits, B., Lee, A. K., Anastassiou, C. A., Andrei, A., Aydın, Ç., Barbic, M., Blanche, T. J., Bonin, V., Couto, J., Dutta, B., Gratiy, S. L., Gutnisky, D. A., Häusser, M., Karsh, B., … Harris, T. D. (2017). Fully integrated silicon probes for high-density recording of neural activity. *Nature*, *551*(7679), 232–236. https://doi.org/10.1038/nature24636
+
+Steinmetz, N. A., Aydin, C., Lebedeva, A., Okun, M., Pachitariu, M., Bauza, M., Beau, M., Bhagat, J., Böhm, C., Broux, M., Chen, S., Colonell, J., Gardner, R. J., Karsh, B., Kloosterman, F., Kostadinov, D., Mora-Lopez, C., O'Callaghan, J., Park, J., … Harris, T. D. (2021). Neuropixels 2.0: A miniaturized high-density probe for stable, long-term brain recordings. *Science*, *372*(6539), eabf4588. https://doi.org/10.1126/science.abf4588
+
+Yang, S., Madsen, M. S., & Bednar, J. A. (2022). HoloViz: Visualization and Interactive Dashboards in Python. *Proceedings of the 28th ACM SIGKDD Conference on Knowledge Discovery and Data Mining*, 4846–4847. https://doi.org/10.1145/3534678.3542621
+
+Ye, Z., Shelton, A. M., Shaker, J. R., Boussard, J., Colonell, J., Birman, D., Manavi, S., Chen, S., Windolf, C., Hurwitz, C., Yu, H., Namima, T., Pedraja, F., Weiss, S., Raducanu, B. C., Ness, T. V., Jia, X., Mastroberardino, G., Rossi, L. F., … Steinmetz, N. A. (2025). Ultra-high-density Neuropixels probes improve detection and identification in neuronal recordings. *Neuron*. https://doi.org/10.1016/j.neuron.2025.08.030
