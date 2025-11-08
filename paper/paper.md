@@ -9,14 +9,13 @@ tags:
 authors:
   - name: Maxime Beau
     orcid: 0000-0002-8907-6612
-    equal-contrib: true
+    corresponding: true
     affiliation: "1, 2"
   - name: Christian Tabedzki
     orcid: 0000-0001-8409-6094
     affiliation: 1
   - name: Carlos D. Brody
     orcid: 0000-0002-4201-561X
-    corresponding: true
     affiliation: "1, 2"
 affiliations:
   - name: Princeton Neuroscience Institute, Princeton University, USA
