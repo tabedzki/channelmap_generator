@@ -133,6 +133,33 @@ If SpikeGLX seems to ignore the `.imro` file when you try to load it, make sure 
 This is expected behavior for non-canonical IMRO tables. SpikeGLX greys out editing features for imported tables that don't match its canonical format (being whole/half-shank width boxes that enclose all AP channels with attributes for all channels). This allows SpikeGLX to use external tables "as is" without knowing how to modify them safely. If you need to make adjustments, use the [online gui](https://neuropixels-channelmap-generator.pni.princeton.edu) again: upload your `.imro`file as a starting point, then modify your `.imro`table before re-downlading it and re-importing into SpikeGLX.
 
 
+# Testing
+
+PixelMap includes a comprehensive automated test suite to ensure software reliability. The tests cover:
+- Hardware constraint validation
+- All preset configurations for supported probe types
+- IMRO file generation and I/O operations
+- End-to-end workflows
+
+## Running Tests Locally
+
+```bash
+# Install test dependencies
+pip install pytest pytest-cov
+
+# Run all tests
+pytest tests/
+
+# Run tests with coverage report
+pytest tests/ --cov=channelmap_generator --cov-report=term
+```
+
+## Continuous Integration
+
+Tests run automatically via GitHub Actions on every push and pull request. The test status badge shows whether all tests are passing:
+
+![Tests](https://github.com/m-beau/channelmap_generator/actions/workflows/tests.yml/badge.svg)
+
 # Roadmap
 
 Supported Neuropixels versions:
