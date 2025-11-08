@@ -27,17 +27,17 @@ bibliography: paper.bib
 
 # Abstract
 
-PixelMap is a browser-based application for creating custom channelmaps for Neuropixels probes that respects electrode wiring constraints. Neuropixels probes, widely used for high-density neural recordings, possess more physical electrodes than can be used for simultaneous recording because they contain fewer analogue-to-digital converters (ADCs) than data lines. Each ADC is hard-wired to several electrodes, creating complex interdependencies where selecting one electrode makes others unavailable. PixelMap provides an installation-free, browser-based interface for researchers to design arbitrary recording configurations that meet their experimental requirements while satisfying these hardware constraints. The tool generates IMRO (IMec Read Out) files compatible with SpikeGLX, the most common data acquisition software for Neuropixels recordings.
+PixelMap is a browser-based application for creating custom channelmaps for Neuropixels probes that respects electrode wiring constraints. Neuropixels probes, widely used for high-density neural recordings, have more physical electrodes than can be used for simultaneous recording because they contain fewer analogue-to-digital converters (ADCs) than data lines. Each ADC is hard-wired to several electrodes, creating complex interdependencies where selecting one electrode makes others unavailable. PixelMap provides an installation-free, browser-based interface for researchers to design arbitrary recording configurations that meet their experimental requirements while satisfying these hardware constraints. The tool generates IMRO (IMec Read Out) files compatible with SpikeGLX, the most common data acquisition software for Neuropixels recordings.
 
 # Statement of need
 
 Neuropixels probes have revolutionised systems neuroscience by enabling simultaneous recordings from hundreds of neurons at spike resolution across multiple brain regions at any depth [@jun2017; @beau2021; @steinmetz2021; @bondy2024; @ye2025; @beau2025]. However, configuring these probes for successful recording of neural data presents challenges. Neuropixels probes fit 960 to 5120 electrodes but can only record from 384 or 1536 channels simultaneously (Table 1), limited by the number of integrated analogue-to-digital converters (ADCs). The electrode-to-ADC wiring map follows complex patterns that vary with each Neuropixels version, making manual channel selection error-prone and time-consuming.
 
-While existing tools like SpikeGLX and Open Ephys provide tools to edit channelmaps as `.imro` files, they require desktop apps, lack user-friendliness, and do not allow selection of fully arbitrary electrode geometries. Researchers often need custom channel configurations to target specific brain regions or optimise spatial sampling, but creating these configurations manually requires a deep understanding of the probe's wiring architecture and careful verification to avoid wiring violations.
+While existing tools like SpikeGLX and Open Ephys provide ways to edit channelmaps as `.imro` files, they require desktop apps and do not easily allow selection of fully arbitrary electrode geometries. Researchers often need custom channel configurations to target specific brain regions or optimise spatial sampling, but creating these configurations manually requires a deep understanding of the probe's wiring architecture and careful verification to avoid wiring violations.
 
 PixelMap addresses these needs by:
 
-1. **Being available on any machine installation-free**: The tool is available as a web application at https://pixelmap.pni.princeton.edu but can also be installed locally as a Python package.
+1. **Being available on any machine installation-free**: The tool is available as a web application at [https://pixelmap.pni.princeton.edu](https://pixelmap.pni.princeton.edu)as a Python package.
 2. **Visualising wiring constraints interactively**: When users select electrodes, the interface immediately shows which other electrodes become unavailable (marked in black) due to shared ADC lines, preventing invalid configurations.
 3. **Supporting arbitrary electrode geometries**: Users can select electrodes through (i) picking from presets for common geometries, (ii) textually entering electrode ranges, enabling repeatable selection, (iii) dragging selection boxes and clicking on the probe visualisation itself, and (iv) loading pre-existing `.imro` files. These four selection methods are intercompatible so can be used together. For instance, a SpikeGLX `.imro` file can be loaded as a starting point, and selection boxes used to further refine the channelmap geometry.
 
@@ -69,12 +69,12 @@ Finally, the **graphical user interface** at `./gui/gui.py` was built with Holov
 
 PixelMap can be used through:
 
-1. **Web application**: Available at https://pixelmap.pni.princeton.edu for immediate use without installation.
+1. **Web application**: Available at [https://pixelmap.pni.princeton.edu](https://pixelmap.pni.princeton.edu) for immediate use without installation.
 2. **Local installation**: Via pip (`pip install .`) or uv (`uv run cmap_gui`) from the cloned GitHub repository.
 3. **Docker container**: Users can download the image used for the website and run the container locally.
 4. **Programmatic API**: Python scripts can directly call `generate_imro_channelmap()` for batch processing or integration into analysis pipelines.
 
-For more details, see the project repository at https://github.com/m-beau/channelmap_generator.
+For more details, see the project repository at [https://github.com/m-beau/channelmap_generator](https://github.com/m-beau/channelmap_generator).
 
 The software includes an automated test suite with 41 tests covering hardware constraint validation, all preset configurations, IMRO file generation for all supported probe types, and end-to-end workflows. Tests run automatically via GitHub Actions continuous integration on every code change, ensuring software reliability. See the repository's `tests/` directory for details.
 
@@ -82,14 +82,14 @@ The software includes an automated test suite with 41 tests covering hardware co
 
 |                          | Maxime Beau | Christian Tabedzki | Carlos D. Brody |
 |--------------------------|:-----------:|:------------------:|:------------:|
-| Conceptualisation        |      ✓      |                    |              |
-| Backend and GUI          |      ✓      |                    |              |
-| App hosting              |             |         ✓          |              |
-| Supervision and funding  |             |                    |      ✓       |
+| Conceptualisation        |      X      |                    |              |
+| Backend and GUI          |      X      |                    |              |
+| App hosting              |             |         X          |              |
+| Supervision and funding  |             |                    |      X       |
 
 
 # Acknowledgements
 
-We thank the Princeton Neuroscience Institute for hosting the web application. We thank Jesse C. Kaminsky, Jorge Yanar, Julie Fabre, and members of the Brody laboratory for testing and feedback during development, and PNI IT members Garrett McGrath and Gary Lyons for their advice concerning hosting. This work was supported by Howard Hughes Medical Institute and the National Institutes of Health.
+We thank Julie Fabre for discussions and designing PixelMap's logo. We also thank Jesse C. Kaminsky, Jorge Yanar, and members of the Brody laboratory for testing and feedback during development, and PNI IT members Garrett McGrath and Gary Lyons for their advice concerning hosting. Finally, we thank the Princeton Neuroscience Institute for hosting the web application. This work was supported by Howard Hughes Medical Institute and the National Institutes of Health.
 
 # References
