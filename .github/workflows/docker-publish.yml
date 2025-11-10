@@ -6,6 +6,7 @@ on:
       - 'v*'  # Trigger on tags that start with 'v'
   release:
     types: [published]
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -55,4 +56,20 @@ jobs:
 
     - name: Image digest
       run: echo ${{ steps.build.outputs.digest }}
+
+  publish-package:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Build package
+        run: uv build
+      - run: uv publish --trusted-publishing always
+
 
