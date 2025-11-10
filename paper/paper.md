@@ -37,7 +37,7 @@ While existing tools like SpikeGLX and Open Ephys provide ways to edit channelma
 
 PixelMap addresses these needs by:
 
-1. **Being available on any machine installation-free**: The tool is available as a web application at [https://pixelmap.pni.princeton.edu](https://pixelmap.pni.princeton.edu)as a Python package.
+1. **Being available on any machine installation-free**: The tool is available as a web application at [https://pixelmap.pni.princeton.edu](https://pixelmap.pni.princeton.edu) as a Python package.
 2. **Visualising wiring constraints interactively**: When users select electrodes, the interface immediately shows which other electrodes become unavailable (marked in black) due to shared ADC lines, preventing invalid configurations.
 3. **Supporting arbitrary electrode geometries**: Users can select electrodes through (i) picking from presets for common geometries, (ii) textually entering electrode ranges, enabling repeatable selection, (iii) dragging selection boxes and clicking on the probe visualisation itself, and (iv) loading pre-existing `.imro` files. These four selection methods are intercompatible so can be used together. For instance, a SpikeGLX `.imro` file can be loaded as a starting point, and selection boxes used to further refine the channelmap geometry.
 
