@@ -71,5 +71,5 @@ jobs:
           enable-cache: true
       - name: Build package
         run: uv build
-      - run: uv publish --trusted-publishing always
+      - run: uv publish --trusted-publishing always --index testpypi
 
