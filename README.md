@@ -128,6 +128,7 @@ Reloading the page should fix most issues. If you have crappy network on your ma
 
 <ins>SpikeGLX ignores my `.imro` file upon upload!</ins><br>
 If SpikeGLX seems to ignore the `.imro` file when you try to load it, make sure that the <ins>probe subtype</ins> is correct. You can find the subtype as the **first number of the first tuple of the probe's imro table**, either in the default `.imro` file made by SpikeGLX (save it to file though the IM setup tab), or in the `.meta` file saved alongside any recording from that probe (~imroTbl field, the last field of the file).
+Note: SpikeGLX's probe visualizer (the probe-shaped heatmap GUI) may not display the right probe subtype (e.g. it may display NP2014 for a 2013 probe). You must check the manually-saved `.imro` file, or `.meta` file saved alongside a sample recording, to be certain of your probe's subtype.
 
 <ins>After loading the `.imro` file, SpikeGLX IMRO editing options become greyed out!</ins><br>
 This is expected behavior for non-canonical IMRO tables. SpikeGLX greys out editing features for imported tables that don't match its canonical format (being whole/half-shank width boxes that enclose all AP channels with attributes for all channels). This allows SpikeGLX to use external tables "as is" without knowing how to modify them safely. If you need to make adjustments, use the [online gui](https://neuropixels-channelmap-generator.pni.princeton.edu) again: upload your `.imro`file as a starting point, then modify your `.imro`table before re-downlading it and re-importing into SpikeGLX.
