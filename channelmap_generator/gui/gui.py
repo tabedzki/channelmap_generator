@@ -6,6 +6,7 @@ Using Bokeh for better interactivity with hover, click, and rectangular selectio
 
 import re
 import gc
+import json
 from io import BytesIO, StringIO
 from pathlib import Path
 from dataclasses import dataclass, field
@@ -104,7 +105,7 @@ class ChannelmapGUI(param.Parameterized):
     # Parameters - will take their value as attributes after class initialization
     default_type = "2.0-4shanks"
     download_button_color = param.String(default="default")
-    download_button_label = param.String(default="Select electrodes...")
+    download_button_label = param.String(default="Select...")
 
     probe_type = param.Selector(default=default_type, objects=list(PROBE_TYPE_MAP.keys()), doc="Neuropixels probe type")
 
@@ -253,8 +254,8 @@ class ChannelmapGUI(param.Parameterized):
             electrode_height = 9 if self.probe_type == "2.0-1shank" else 14
         else:
             # Multi-shank
-            shank_width = 60
-            shank_spacing = 150
+            shank_width = 100
+            shank_spacing = 250
             electrode_width = 12
             electrode_height = 8
 
@@ -271,7 +272,7 @@ class ChannelmapGUI(param.Parameterized):
                 # Calculate shank center
                 x_center = shank_id * shank_spacing
                 # Map electrode position within shank
-                x_norm = (orig_x - 16) / 16
+                x_norm = (orig_x - x_center - 16) / 16
                 x = x_center + x_norm * (shank_width * 0.7) / 2
 
             # Determine electrode status and color
@@ -364,8 +365,8 @@ class ChannelmapGUI(param.Parameterized):
 
         else:
             # Multi-shank outlines
-            shank_width = 60
-            shank_spacing = 150
+            shank_width = 100
+            shank_spacing = 250
             xlim = [-shank_width / 2 - 100, 3 * shank_spacing + shank_width / 2 + 100]
 
             for shank_id in range(4):
@@ -623,9 +624,10 @@ class ChannelmapGUI(param.Parameterized):
     def update_filename(self, reset=False):
         if reset:
             self.filename_input.value = f"manual_selection_{self.probe_type}"
-        self.filename_input.value = self.filename_input.value.replace(".imro", "").replace(".pdf", "")
+        self.filename_input.value = self.filename_input.value.replace(".imro", "").replace(".pdf", "").replace(".json", "")
         self.download_imro_button.filename = f"{self.filename_input.value}.imro"
         self.download_pdf_button.filename = f"{self.filename_input.value}.pdf"
+        self.download_kilosort_button.filename = f"{self.filename_input.value}.json"
 
     def generate_imro(self):
         """Generate IMRO file from current selection"""
@@ -693,12 +695,39 @@ class ChannelmapGUI(param.Parameterized):
             # Save current figure to buffer
             plt.savefig(buffer, format="pdf", dpi=300, bbox_inches="tight")
             buffer.seek(0)
-            
+
         finally:
             plt.close('all')
             gc.collect()
-            
+
         return buffer
+
+    def generate_kilosort_channelmap(self):
+        if not self.ready_to_download():
+            return
+
+        # Update filename and generate IMRO list
+        self.update_filename()
+        self.generate_imro()
+
+        # Generate Kilosort channelmap dictionary
+        kilosort_dict = backend.generate_kilosort_channelmap_dict(
+            self.imro_list,
+            self.positions_file
+        )
+
+        # Convert numpy arrays to lists for JSON serialization
+        kilosort_dict_serializable = {
+            'chanMap': kilosort_dict['chanMap'].tolist(),
+            'xc': kilosort_dict['xc'].tolist(),
+            'yc': kilosort_dict['yc'].tolist(),
+            'kcoords': kilosort_dict['kcoords'].tolist(),
+            'n_chan': int(kilosort_dict['n_chan'])
+        }
+
+        # Convert to JSON string and return as StringIO
+        json_str = json.dumps(kilosort_dict_serializable, indent=2)
+        return StringIO(json_str)
 
     def apply_uploaded_imro(self):
 
@@ -1016,23 +1045,33 @@ class ChannelmapGUI(param.Parameterized):
             callback=self.generate_imro_content,
             filename=f"{self.filename_input.value}.imro",
             button_type=self.download_button_color,
-            width=140,
+            width=87,
             icon="file-text",
             label=self.download_button_label,
         )
-        
+
         self.download_pdf_button = pn.widgets.FileDownload(
             callback=self.generate_pdf_content,
             filename=f"{self.filename_input.value}.pdf",
             button_type=self.download_button_color,
-            width=140,
+            width=87,
             icon="file-type-pdf",
             label=self.download_button_label.replace("IMRO", "PDF"),
         )
-        
+
+        self.download_kilosort_button = pn.widgets.FileDownload(
+            callback=self.generate_kilosort_channelmap,
+            filename=f"{self.filename_input.value}.json",
+            button_type=self.download_button_color,
+            width=87,
+            icon="file-code",
+            label=self.download_button_label.replace("IMRO", "Kilosort"),
+        )
+
         return pn.Row(
             self.download_imro_button,
             self.download_pdf_button,
+            self.download_kilosort_button,
             sizing_mode="stretch_width",
             margin=(0, 0, 0, 20),
         )
@@ -1227,7 +1266,7 @@ class ChannelmapGUI(param.Parameterized):
             </div>
             """
             self.download_button_color = 'default'
-            self.download_button_label = "Select electrodes..."
+            self.download_button_label = "Select..."
         else:
             counter_html = f"""
             <div style="background: #f0f8ff; border: 2px solid #4a90e2; border-radius: 8px;
@@ -1238,7 +1277,7 @@ class ChannelmapGUI(param.Parameterized):
             </div>
             """
             self.download_button_color = 'success'
-            self.download_button_label = "Download IMRO ⬇"
+            self.download_button_label = "IMRO ⬇"
 
         self.electrode_counter.object = counter_html
 

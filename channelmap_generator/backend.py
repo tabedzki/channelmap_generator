@@ -506,6 +506,52 @@ def find_selected_electrodes(imro_list):
     return selected_electrodes
 
 
+def generate_kilosort_channelmap_dict(imro_list, positions_file):
+    """
+    Generate Kilosort-compatible channelmap dictionary from IMRO list.
+
+    Args:
+        imro_list: list of tuples starting with (version, n_channels) header
+        positions_file: Path to CSV file containing electrode positions
+
+    Returns:
+        dict: Kilosort channelmap with keys: chanMap, xc, yc, kcoords, n_chan
+    """
+    # Get selected electrodes [[shank_id, electrode_id], ...]
+    selected_electrodes = find_selected_electrodes(imro_list)
+
+    # Load position data
+    positions_df = pd.read_csv(positions_file)
+
+    # Create mapping from (shank_id, electrode_id) to position
+    n_selected = len(selected_electrodes)
+    chanMap = np.arange(n_selected)  # Sequential channel indices
+    xc = np.zeros(n_selected)
+    yc = np.zeros(n_selected)
+    kcoords = np.zeros(n_selected, dtype=int)  # shank IDs
+
+    for i, (shank_id, electrode_id) in enumerate(selected_electrodes):
+        # Find position for this electrode
+        mask = (positions_df['shank'] == shank_id) & (positions_df['electrode'] == electrode_id)
+        if not mask.any():
+            raise ValueError(f"Electrode {electrode_id} on shank {shank_id} not found in positions file")
+
+        row = positions_df[mask].iloc[0]
+        xc[i] = row['x']
+        yc[i] = row['y']
+        kcoords[i] = shank_id
+
+    kilosort_dict = {
+        'chanMap': chanMap,
+        'xc': xc,
+        'yc': yc,
+        'kcoords': kcoords,
+        'n_chan': n_selected
+    }
+
+    return kilosort_dict
+
+
 def plot_probe_layout(
     probe_type, imro_list, positions_file, wiring_file, title, figsize=(2, 30), save_plot=False, saveDir=None
 ):
@@ -668,6 +714,7 @@ def plot_probe_layout(
 
         shank_width = 80
         shank_spacing = 150
+        true_shank_spacing = 250
         electrode_width_ratio = 0.18
         electrode_height = 10
         electrode_width = shank_width * electrode_width_ratio
@@ -738,7 +785,7 @@ def plot_probe_layout(
 
                 # Map electrode positions to shank width (normalized then scaled)
                 # Original positions: 0,32 μm (center at 16) - always 2.0
-                x_norm = (orig_x - 16) / 16
+                x_norm = (orig_x - true_shank_spacing * shank_id - 16) / 16
                 x = x_center + x_norm * (shank_width * 0.5) / 2
 
                 rect = patches.Rectangle(
