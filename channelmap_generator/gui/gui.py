@@ -35,6 +35,7 @@ from bokeh.models import (
 from bokeh.plotting import figure
 
 from channelmap_generator import __version__
+from channelmap_generator.analytics import AnalyticsSessionTracker
 from channelmap_generator.constants import PROBE_N, PROBE_TYPE_MAP, SUPPORTED_1shank_PRESETS, SUPPORTED_4shanks_PRESETS, WIRING_FILE_MAP, REF_ELECTRODES
 from channelmap_generator.utils import imro
 from channelmap_generator.types import Electrode
@@ -1291,9 +1292,15 @@ class ChannelmapGUI(param.Parameterized):
 def create_app():
     """Create and configure the Panel app"""
     gui = ChannelmapGUI()
+    analytics_tracker = AnalyticsSessionTracker()
     layout = gui.create_layout()
 
     # Update status initially
     gui.update_electrode_counter()
 
-    return layout
+    if pn.state.curdoc:
+        pn.state.curdoc.on_session_destroyed(analytics_tracker.handle_session_destroyed)
+
+    app_layout = pn.Column(analytics_tracker.cookie_bridge, layout, margin=0)
+    app_layout._analytics_tracker = analytics_tracker
+    return app_layout

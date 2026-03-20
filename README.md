@@ -57,6 +57,22 @@ docker run --rm --name channelmap-app -p 5008:5008 --pull=always ghcr.io/m-beau/
 
 For a more robust deployment, use **Docker Compose**. See the included `docker-compose.yml` for configuration details.
 
+### Optional visitor analytics
+
+For self-hosted deployments, PixelMap can persist lightweight visitor analytics to SQLite so you can estimate unique visitors and see where traffic is coming from without requiring sign-in.
+
+- The SQLite file location is controlled with `ANALYTICS_DB_PATH` and defaults to `/app/output/visitor_analytics.sqlite3` in the provided Compose examples.
+- The app stores raw visit events plus a visitor summary keyed by an anonymous browser cookie, with IP address, user agent, proxy forwarding header, and timestamps retained for server-side reporting.
+- If you deploy behind a reverse proxy and want to use forwarded client IPs, set `ANALYTICS_TRUST_PROXY_HEADERS=true`.
+- The default Compose files already mount `./output:/app/output`, so keeping the database under `/app/output` will persist it across container restarts.
+
+Example override:
+
+```bash
+ANALYTICS_DB_PATH=/app/output/custom-analytics.sqlite3
+ANALYTICS_TRUST_PROXY_HEADERS=true
+```
+
 </details>
 <br>
 
