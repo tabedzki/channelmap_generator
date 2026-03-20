@@ -46,7 +46,7 @@ from channelmap_generator.types import Electrode
 from channelmap_generator.utils import imro
 
 ## Configure logging
-basicConfig(level=logging.ERROR) # no warnings
+basicConfig(level=logging.ERROR)  # no warnings
 
 # Paths to assets
 WIRING_MAPS_DIR = Path(__file__).resolve().parent.parent / "wiring_maps"
@@ -62,6 +62,7 @@ pn.extension("tabulator", notifications=True)
 ###################################
 #### Electrode selection logic ####
 ###################################
+
 
 @dataclass
 class Electrodes:

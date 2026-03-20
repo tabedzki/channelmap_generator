@@ -5,9 +5,10 @@ Provides common test data including wiring DataFrames for all probe types
 and sample electrode selections for testing.
 """
 
-import pytest
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
+import pytest
 
 from channelmap_generator.constants import WIRING_FILE_MAP
 
