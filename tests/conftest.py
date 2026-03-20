@@ -9,7 +9,7 @@ import pytest
 import pandas as pd
 from pathlib import Path
 
-from channelmap_generator.constants import WIRING_FILE_MAP, PROBE_TYPE_MAP
+from channelmap_generator.constants import WIRING_FILE_MAP
 
 
 @pytest.fixture
