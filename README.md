@@ -85,9 +85,7 @@ Bug reports and feature requests are welcome via [GitHub Issues](https://github.
 
 ## Citation
 
-If you use PixelMap in your research, please cite:
-
-> Beau M., Tabedzki C., Brody C.D. (2024). *PixelMap: An Application for Flexible Electrode Selection on Neuropixels Probes.* Journal of Open Source Software. <!-- TODO: update with DOI once published -->
+A paper describing PixelMap is being prepared for submission to the Journal of Open Source Software (JOSS). A DOI and citation will be provided here once published.
 
 ## License
 

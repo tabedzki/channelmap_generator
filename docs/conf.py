@@ -48,8 +48,8 @@ intersphinx_mapping = {
 
 html_theme = "furo"
 html_title = "PixelMap"
-html_logo = "../channelmap_generator/gui/assets/npix_map_logo.png"
-html_static_path = []
+html_logo = "_static/npix_map_logo.png"
+html_static_path = ["_static"]
 
 html_theme_options = {
     "source_repository": "https://github.com/m-beau/channelmap_generator",

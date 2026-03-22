@@ -2,7 +2,7 @@
 
 **A browser-based GUI to generate Neuropixels channelmaps that respect electrode-ADC wiring constraints.**
 
-```{image} ../channelmap_generator/gui/assets/GUI_screenshot.png
+```{image} _static/GUI_screenshot.png
 :alt: PixelMap GUI screenshot
 :width: 100%
 ```
