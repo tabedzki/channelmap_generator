@@ -38,10 +38,10 @@ dependencies = [
 cmap_gui = "channelmap_generator.gui.app_util:main"
 
 [project.urls]
-Homepage = "https://github.com/m-beau/channelmap-generator"
-Documentation = "https://github.com/m-beau/channelmap-generator#readme"
-Repository = "https://github.com/m-beau/channelmap-generator"
-Issues = "https://github.com/m-beau/channelmap-generator/issues"
+Homepage = "https://github.com/m-beau/channelmap_generator"
+Documentation = "https://github.com/m-beau/channelmap_generator#readme"
+Repository = "https://github.com/m-beau/channelmap_generator"
+Issues = "https://github.com/m-beau/channelmap_generator/issues"
 
 [tool.setuptools.dynamic]
 version = {attr = "channelmap_generator.__version__"}
