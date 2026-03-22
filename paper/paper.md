@@ -70,7 +70,7 @@ Finally, the **graphical user interface** at `./gui/gui.py` was built with HoloV
 PixelMap can be used through:
 
 1. **Web application**: Available at [https://pixelmap.pni.princeton.edu](https://pixelmap.pni.princeton.edu) for immediate use without installation.
-2. **Local installation**: Via pip (`pip install .`) or uv (`uv run cmap_gui`) from the cloned GitHub repository.
+2. **Local installation**: Via pip (`pip install .`) or uv (`uv run pixelmap`) from the cloned GitHub repository.
 3. **Docker container**: Users can download the image used for the website and run the container locally.
 4. **Programmatic API**: Python scripts can directly call `generate_imro_channelmap()` for batch processing or integration into analysis pipelines.
 

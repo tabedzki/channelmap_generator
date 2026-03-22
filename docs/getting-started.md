@@ -13,7 +13,7 @@
 ```bash
 git clone https://github.com/m-beau/pixelmap.git
 cd pixelmap
-uv run cmap_gui  # installs dependencies and launches the GUI
+uv run pixelmap  # installs dependencies and launches the GUI
 ```
 
 To install dependencies without launching the GUI:
@@ -59,7 +59,7 @@ For production deployments, use **Docker Compose** — see the included `docker-
 Launch the GUI locally:
 
 ```bash
-uv run cmap_gui   # or just: cmap_gui (if installed with pip)
+uv run pixelmap   # or just: pixelmap (if installed with pip)
 ```
 
 Or use the [online version](https://pixelmap.pni.princeton.edu/app) directly — no installation required.

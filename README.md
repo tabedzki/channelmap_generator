@@ -32,7 +32,7 @@
 ```bash
 git clone https://github.com/m-beau/pixelmap.git
 cd pixelmap
-uv run cmap_gui  # installs dependencies automatically and launches the GUI
+uv run pixelmap  # installs dependencies automatically and launches the GUI
 ```
 
 Also available via [pip, conda, or Docker](https://pixelmap.readthedocs.io/en/latest/getting-started.html).
@@ -44,7 +44,7 @@ Use the [online GUI](https://pixelmap.pni.princeton.edu/app) directly in your br
 Or launch it locally:
 
 ```bash
-uv run cmap_gui   # or: cmap_gui (if installed with pip)
+uv run pixelmap   # or: pixelmap (if installed with pip)
 ```
 
 1. **Select your probe type** from the dropdown.

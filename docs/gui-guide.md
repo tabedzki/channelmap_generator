@@ -5,7 +5,7 @@ The PixelMap GUI is a browser-based interface for designing Neuropixels channelm
 ## Launching the GUI
 
 ```bash
-uv run cmap_gui   # or: cmap_gui (if installed with pip)
+uv run pixelmap   # or: pixelmap (if installed with pip)
 ```
 
 Or use the [online version](https://pixelmap.pni.princeton.edu/app) — no installation required.
