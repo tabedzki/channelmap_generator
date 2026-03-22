@@ -1,18 +1,16 @@
-# For general panel serving, both in Docker and in Ploomber
+"""For general panel serving, both in Docker and in Ploomber"""
 
-from pathlib import Path
-
-import psutil
-import time
 import socket
 import threading
+import time
 
 import panel as pn
+import psutil
 
-# sys.path.insert(0, str(Path(__file__).parent))
 from channelmap_generator.gui.gui import create_app
 
 pn.extension(notifications=True)
+
 
 def find_free_port(start_port=5007):
     """Find next available port starting from start_port"""
@@ -25,12 +23,14 @@ def find_free_port(start_port=5007):
                 continue
     raise RuntimeError("No free ports found")
 
+
 def memory_monitorer():
     process = psutil.Process()
     while True:
         memory_mb = process.memory_info().rss / 1024 / 1024
         print(f"Memory usage: {memory_mb:.1f} MB")
         time.sleep(10)
+
 
 def monitor_memory():
     threading.Thread(target=memory_monitorer, daemon=True).start()
