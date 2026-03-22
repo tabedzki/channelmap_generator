@@ -39,7 +39,7 @@ cmap_gui = "channelmap_generator.gui.app_util:main"
 
 [project.urls]
 Homepage = "https://github.com/m-beau/channelmap_generator"
-Documentation = "https://github.com/m-beau/channelmap_generator#readme"
+Documentation = "https://channelmap-generator.readthedocs.io"
 Repository = "https://github.com/m-beau/channelmap_generator"
 Issues = "https://github.com/m-beau/channelmap_generator/issues"
 
@@ -56,6 +56,14 @@ channelmap_generator = [
     "gui/*/*.png",
     "gui/*/*.svg",
     "example_layouts/*.pdf",
+]
+
+[project.optional-dependencies]
+docs = [
+    "sphinx>=7.0",
+    "furo",
+    "myst-parser",
+    "sphinx-design",
 ]
 
 [dependency-groups]
