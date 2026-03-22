@@ -4,22 +4,19 @@ Interactive GUI for Neuropixels Channelmap Generation
 Using Bokeh for better interactivity with hover, click, and rectangular selection
 """
 
-import re
 import gc
 import json
+import logging
+import re
+from dataclasses import dataclass, field
 from io import BytesIO, StringIO
 from pathlib import Path
-from dataclasses import dataclass, field
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import panel as pn
 import param
-
-import logging
-from bokeh.util.logconfig import basicConfig
-basicConfig(level=logging.ERROR) # no warnings
 from bokeh import events
 from bokeh.models import (
     BoxSelectTool,
@@ -33,12 +30,23 @@ from bokeh.models import (
     WheelZoomTool,
 )
 from bokeh.plotting import figure
+from bokeh.util.logconfig import basicConfig
 
-from channelmap_generator import __version__
-from channelmap_generator.constants import PROBE_N, PROBE_TYPE_MAP, SUPPORTED_1shank_PRESETS, SUPPORTED_4shanks_PRESETS, WIRING_FILE_MAP, REF_ELECTRODES
-from channelmap_generator.utils import imro
+from channelmap_generator import __version__, backend
+from channelmap_generator.analytics import AnalyticsSessionTracker
+from channelmap_generator.constants import (
+    PROBE_N,
+    PROBE_TYPE_MAP,
+    REF_ELECTRODES,
+    WIRING_FILE_MAP,
+    SUPPORTED_1shank_PRESETS,
+    SUPPORTED_4shanks_PRESETS,
+)
 from channelmap_generator.types import Electrode
-from channelmap_generator import backend
+from channelmap_generator.utils import imro
+
+## Configure logging
+basicConfig(level=logging.ERROR)  # no warnings
 
 # Paths to assets
 WIRING_MAPS_DIR = Path(__file__).resolve().parent.parent / "wiring_maps"
@@ -55,10 +63,11 @@ pn.extension("tabulator", notifications=True)
 #### Electrode selection logic ####
 ###################################
 
+
 @dataclass
 class Electrodes:
     """Manages electrode selection state."""
-    
+
     wiring_map: dict[Electrode, set[Electrode]]
     n_maximum_electrodes: int # TODO: implement per-shank maximum for NXTs
     available: set[Electrode] = field(default_factory=set)
@@ -67,7 +76,7 @@ class Electrodes:
 
     def __post_init__(self):
         self.available = set(self.wiring_map.keys())
-    
+
     def select(self, electrode: Electrode):
         if electrode in self.available \
             and len(self.selected) < self.n_maximum_electrodes:
@@ -78,7 +87,7 @@ class Electrodes:
             newly_unavailable = conflicting_electrodes & self.available
             self.available -= newly_unavailable
             self.unavailable |= newly_unavailable
-    
+
     def deselect(self, electrode: Electrode):
         if electrode in self.selected:
             self.selected.discard(electrode)
@@ -452,8 +461,8 @@ class ChannelmapGUI(param.Parameterized):
 
         # Update the data source with new data, replacing old arrays
         self.electrode_source.data.update(
-            {"color": colors.tolist(), "alpha": alphas.tolist(), 
-             "line_color": line_colors.tolist(), "line_width": line_widths.tolist(), 
+            {"color": colors.tolist(), "alpha": alphas.tolist(),
+             "line_color": line_colors.tolist(), "line_width": line_widths.tolist(),
              "status": statuses.tolist()}
         )
 
@@ -514,7 +523,7 @@ class ChannelmapGUI(param.Parameterized):
 
         # Clear the selection to allow for new interactions
         self.electrode_source.selected.indices = []
-        
+
         gc.collect()
 
 
@@ -540,7 +549,7 @@ class ChannelmapGUI(param.Parameterized):
             preset_electrodes = backend.get_preset_candidates(self.preset, self.probe_type, self.wiring_df)
             for shank_id, electrode_id in preset_electrodes:
                 self.electrodes.select(Electrode(shank_id, electrode_id))
-            
+
             # Update visualization
             self.update_electrode_colors()
             self.update_electrode_counter()
@@ -735,13 +744,13 @@ class ChannelmapGUI(param.Parameterized):
             pn.state.notifications.warning("No .imro file found - upload one before clicking this button.",
                                     duration=10_000)
             return
-        
+
         file_extension = str(self.imro_file_loader.filename).split(".")[-1]
         if file_extension != "imro":
             pn.state.notifications.error(f"You must upload an .imro file, not .{file_extension}!",
                                     duration=10_000)
             return
-        
+
         imro_file_content = self.imro_file_loader.value
         if isinstance(imro_file_content, bytes):
             imro_file_content = imro_file_content.decode("utf-8")
@@ -1215,11 +1224,11 @@ class ChannelmapGUI(param.Parameterized):
             # Clear all renderers and tools to prevent memory accumulation
             self.plot.renderers.clear()
             self.plot.toolbar.tools.clear()
-            
+
         if hasattr(self, 'electrode_source') and self.electrode_source is not None:
             # Clear data source
             self.electrode_source.data.clear()
-            
+
         if hasattr(self, 'tool_state_source') and self.tool_state_source is not None:
             # Clear tool state source
             self.tool_state_source.data.clear()
@@ -1249,7 +1258,7 @@ class ChannelmapGUI(param.Parameterized):
         """
         # Update reference_id parameter objects based on the new probe_subtype
         self.param.reference_id.objects = list(REF_ELECTRODES[self.probe_subtype].keys())
-        
+
         # Set reference_id to the first available option if current selection is not available
         if self.reference_id not in self.param.reference_id.objects:
             self.reference_id = self.param.reference_id.objects[0]
@@ -1291,9 +1300,15 @@ class ChannelmapGUI(param.Parameterized):
 def create_app():
     """Create and configure the Panel app"""
     gui = ChannelmapGUI()
+    analytics_tracker = AnalyticsSessionTracker()
     layout = gui.create_layout()
 
     # Update status initially
     gui.update_electrode_counter()
 
-    return layout
+    if pn.state.curdoc:
+        pn.state.curdoc.on_session_destroyed(analytics_tracker.handle_session_destroyed)
+
+    app_layout = pn.Column(analytics_tracker.cookie_bridge, layout, margin=0)
+    app_layout._analytics_tracker = analytics_tracker
+    return app_layout
