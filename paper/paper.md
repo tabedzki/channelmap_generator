@@ -74,7 +74,7 @@ PixelMap can be used through:
 3. **Docker container**: Users can download the image used for the website and run the container locally.
 4. **Programmatic API**: Python scripts can directly call `generate_imro_channelmap()` for batch processing or integration into analysis pipelines.
 
-For more details, see the project repository at [https://github.com/m-beau/channelmap_generator](https://github.com/m-beau/channelmap_generator).
+For more details, see the project repository at [https://github.com/m-beau/pixelmap](https://github.com/m-beau/pixelmap).
 
 The software includes an automated test suite with 41 tests covering hardware constraint validation, all preset configurations, IMRO file generation for all supported probe types, and end-to-end workflows. Tests run automatically via GitHub Actions continuous integration on every code change, ensuring software reliability. See the repository's `tests/` directory for details.
 

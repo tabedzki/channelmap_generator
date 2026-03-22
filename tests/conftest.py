@@ -10,13 +10,13 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from channelmap_generator.constants import WIRING_FILE_MAP
+from pixelmap.constants import WIRING_FILE_MAP
 
 
 @pytest.fixture
 def wiring_maps_dir():
     """Path to wiring maps directory."""
-    return Path(__file__).parent.parent / "channelmap_generator" / "wiring_maps"
+    return Path(__file__).parent.parent / "pixelmap" / "wiring_maps"
 
 
 @pytest.fixture

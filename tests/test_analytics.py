@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from channelmap_generator.analytics import (
+from pixelmap.analytics import (
     build_request_context,
     build_visitor_key,
     get_total_visits,

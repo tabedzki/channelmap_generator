@@ -1,9 +1,9 @@
 services:
-  channelmap-generator:
+  pixelmap:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: channelmap-generator
+    container_name: pixelmap
     env_file:
       - .env
     ports:

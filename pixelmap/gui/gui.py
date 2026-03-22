@@ -32,9 +32,9 @@ from bokeh.models import (
 from bokeh.plotting import figure
 from bokeh.util.logconfig import basicConfig
 
-from channelmap_generator import __version__, backend
-from channelmap_generator.analytics import AnalyticsSessionTracker
-from channelmap_generator.constants import (
+from pixelmap import __version__, backend
+from pixelmap.analytics import AnalyticsSessionTracker
+from pixelmap.constants import (
     PROBE_N,
     PROBE_TYPE_MAP,
     REF_ELECTRODES,
@@ -42,8 +42,8 @@ from channelmap_generator.constants import (
     SUPPORTED_1shank_PRESETS,
     SUPPORTED_4shanks_PRESETS,
 )
-from channelmap_generator.types import Electrode
-from channelmap_generator.utils import imro
+from pixelmap.types import Electrode
+from pixelmap.utils import imro
 
 ## Configure logging
 basicConfig(level=logging.ERROR)  # no warnings
@@ -1138,12 +1138,12 @@ class ChannelmapGUI(param.Parameterized):
             pn.pane.Markdown(
                 (
                     f"<div style='text-align: center; padding: 12px;'><strong>See project (v{__version__}) at:"
-                    "<br><a href='https://github.com/m-beau/channelmap_generator' "
-                    "target='_blank'>github.com/m-beau/channelmap_generator</a></strong>"
+                    "<br><a href='https://github.com/m-beau/pixelmap' "
+                    "target='_blank'>github.com/m-beau/pixelmap</a></strong>"
                     "<br><span style='font-size: 1.0em;'>We're working towards publishing PixelMap in JOSS, and need to demonstrate impact. "
                     "If you find PixelMap helpful and want to see it improved in the future, <br><b style='color: red;'>you can help us by filling this 1-minute form: "
                     "<a href='https://docs.google.com/forms/d/e/1FAIpQLSeZyha1XEcKHRqY7oW5lNL5ER1YW2XIDagtCfRECCk5PKhBsw/viewform?usp=publish-editor'"
-                    "target='_blank'>link</a></b><br> (and adding a star ⭐ to the <a href='https://github.com/m-beau/channelmap_generator' "
+                    "target='_blank'>link</a></b><br> (and adding a star ⭐ to the <a href='https://github.com/m-beau/pixelmap' "
                     "target='_blank'>repo</a> 😊)</span></div>"
                 ),
                 margin=(0, 0, 0, 40),

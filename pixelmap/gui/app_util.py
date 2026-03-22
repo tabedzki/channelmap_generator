@@ -7,7 +7,7 @@ import time
 import panel as pn
 import psutil
 
-from channelmap_generator.gui.gui import create_app
+from pixelmap.gui.gui import create_app
 
 pn.extension(notifications=True)
 

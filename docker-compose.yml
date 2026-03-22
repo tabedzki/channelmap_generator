@@ -1,7 +1,7 @@
 services:
-  channelmap-generator:
-    image: ghcr.io/m-beau/channelmap_generator:latest
-    container_name: channelmap-generator
+  pixelmap:
+    image: ghcr.io/m-beau/pixelmap:latest
+    container_name: pixelmap
     pull_policy: always
     ports:
       - "5008:5008"

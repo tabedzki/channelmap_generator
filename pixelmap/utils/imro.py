@@ -8,8 +8,8 @@ import pandas as pd
 
 import panel as pn
 
-from channelmap_generator.backend import format_imro_string, get_electrodes
-from channelmap_generator.constants import PROBE_N, PROBE_TYPE_MAP, REF_ELECTRODES
+from pixelmap.backend import format_imro_string, get_electrodes
+from pixelmap.constants import PROBE_N, PROBE_TYPE_MAP, REF_ELECTRODES
 
 def save_to_imro_file(imro_list, filename="channelmap.imro"):
     """
