@@ -27,12 +27,25 @@ services:
       # the host shell instead, which silently becomes `http://localhost:/`
       # -- a healthcheck that can never pass -- when the host doesn't happen
       # to export INTERNAL_PORT.
-      test: ["CMD-SHELL", "curl --fail http://localhost:$${INTERNAL_PORT:-5008}/ || exit 1"]
+      #
+      # /liveness (see entrypoint.sh's --liveness flag), not /app: hitting
+      # /app builds a full Bokeh session per probe (+27 MB RSS, torn down
+      # ~60s later) -- in production that was a session build/destroy cycle
+      # roughly every 31s with zero real users.
+      test: ["CMD-SHELL", "curl --fail http://localhost:$${INTERNAL_PORT:-5008}/liveness || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
     restart: unless-stopped
+    # Cap container memory so the *container* gets OOM-killed and restarted
+    # by Docker's restart policy, not the host. Size as roughly:
+    # ~300 MB base + <= largest atlas you allow users to download + ~6 MB
+    # per open browser tab.
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 2g
 
 volumes:
   # Persists brainglobe atlas downloads across container restarts.
