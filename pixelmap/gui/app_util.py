@@ -61,7 +61,7 @@ def _log_session_start():
             f"Session {session_id} starting "
             f"({num_sessions} live sessions, RSS {rss_mb:.1f} MB)"
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 - falls back to the old message, never raises
         # session_context (and its server_context) is only populated when
         # running under an actual Bokeh server -- fall back rather than
         # error out of the app.
