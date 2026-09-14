@@ -58,6 +58,16 @@ log "ALLOW_WEBSOCKET_ORIGIN $ALLOW_WEBSOCKET_ORIGIN"
 log "NUM_PROCS $NUM_PROCS"
 
 # Start the Panel application
+#
+# --liveness adds a /liveness endpoint that returns 200 without building a
+# Bokeh session (no app.py re-execution, no data load, no plot build). Use
+# it for the container healthcheck instead of /app -- hitting /app builds a
+# full session every probe (+27 MB RSS) and tears it down ~60 s later, which
+# in production caused a session build/destroy cycle roughly every 31 s with
+# zero real users (~2,900/day).
+#
+# --mem-log-frequency periodically logs RSS (via psutil) so an OOM kill
+# (SIGKILL, exit 137) leaves a trail in the logs instead of nothing.
 exec "$PYTHON_BIN" -m panel serve ./app.py \
     --address "$ADDRESS" \
     --port "$INTERNAL_PORT" \
@@ -67,4 +77,6 @@ exec "$PYTHON_BIN" -m panel serve ./app.py \
     --session-token-expiration 3600000 \
     --check-unused-sessions 10000 \
     --unused-session-lifetime 60000 \
+    --liveness \
+    --mem-log-frequency 60000 \
     --show
