@@ -56,6 +56,11 @@ ENV EXTERNAL_PORT=5008
 ENV NUM_PROCS=1
 ENV ADDRESS=0.0.0.0
 ENV ALLOW_WEBSOCKET_ORIGIN=*
+# glibc's malloc never returns freed arenas to the OS; under repeated
+# session bursts idle RSS ratchets upward with zero live sessions (observed
+# 277 -> 476 -> 544 -> 592 -> 615 MB). Capping the number of arenas bounds
+# how much of that high-water mark each one can hold.
+ENV MALLOC_ARENA_MAX=2
 EXPOSE ${INTERNAL_PORT}
 
 # Copy the entrypoint script
@@ -66,7 +71,12 @@ RUN chmod +x /entrypoint.sh
 COPY Dockerfile /Dockerfile
 
 # Health check
-HEALTHCHECK CMD curl --fail http://localhost:${INTERNAL_PORT}/
+#
+# /liveness (added via --liveness in entrypoint.sh) returns 200 without
+# building a Bokeh session. Hitting / or /app instead builds a full session
+# per probe (+27 MB RSS, torn down ~60 s later) -- in production that meant
+# a session build/destroy cycle roughly every 31 s with zero real users.
+HEALTHCHECK CMD curl --fail http://localhost:${INTERNAL_PORT}/liveness
 
 # Set the entrypoint
 ENTRYPOINT ["/entrypoint.sh"]

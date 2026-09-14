@@ -43,13 +43,38 @@ def monitor_memory():
     threading.Thread(target=memory_monitorer, daemon=True).start()
 
 
+def _log_session_start():
+    """Log one informative line per Bokeh session build.
+
+    Each call to this (via `main(local=False)`) re-executes app.py inside a
+    fresh Bokeh session, so this line is the per-session equivalent of the
+    periodic `--mem-log-frequency` RSS log in entrypoint.sh -- it is what
+    shows up in the logs every time a session is built (e.g. from a
+    healthcheck hitting the wrong endpoint, see entrypoint.sh).
+    """
+    try:
+        session_context = pn.state.curdoc.session_context
+        session_id = session_context.id
+        num_sessions = len(session_context.server_context.sessions)
+        rss_mb = psutil.Process().memory_info().rss / 1024 / 1024
+        print(
+            f"Session {session_id} starting "
+            f"({num_sessions} live sessions, RSS {rss_mb:.1f} MB)"
+        )
+    except Exception:
+        # session_context (and its server_context) is only populated when
+        # running under an actual Bokeh server -- fall back rather than
+        # error out of the app.
+        print("Starting app...")
+
+
 def main(show=True, local=True):
     # Monitor potential memory leak
     # monitor_memory()
 
     # Serve the app
-    print("Starting app...")
     if local:
+        print("Starting app...")
         port = find_free_port(5003)
         pn.serve(
             create_app,
@@ -60,4 +85,5 @@ def main(show=True, local=True):
             verbose=True,
         )
     else:
+        _log_session_start()
         create_app().servable(title="Neuropixels Channelmap Generator")

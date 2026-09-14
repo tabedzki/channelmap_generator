@@ -10,6 +10,7 @@ services:
       - "${EXTERNAL_PORT}:${INTERNAL_PORT}"
     volumes:
       - ./output:/app/output
+      - brainglobe_cache:/root/.brainglobe
     environment:
       - ANALYTICS_DB_PATH=${ANALYTICS_DB_PATH:-/app/output/visitor_analytics.sqlite3}
       - ANALYTICS_TRUST_PROXY_HEADERS=${ANALYTICS_TRUST_PROXY_HEADERS:-false}
@@ -18,9 +19,27 @@ services:
       - ANALYTICS_COOKIE_SAMESITE=${ANALYTICS_COOKIE_SAMESITE:-Lax}
       - ANALYTICS_COOKIE_SECURE=${ANALYTICS_COOKIE_SECURE:-false}
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:${INTERNAL_PORT}/"]
+      # /liveness (see entrypoint.sh's --liveness flag), not /app: hitting
+      # /app builds a full Bokeh session per probe (+27 MB RSS, torn down
+      # ~60s later) -- in production that was a session build/destroy cycle
+      # roughly every 31s with zero real users.
+      test: ["CMD", "curl", "--fail", "http://localhost:${INTERNAL_PORT}/liveness"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
     restart: unless-stopped
+    # Cap container memory so the *container* gets OOM-killed and restarted
+    # by Docker's restart policy, not the host. Size as roughly:
+    # ~300 MB base + <= largest atlas you allow users to download + ~6 MB
+    # per open browser tab.
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 2g
+
+volumes:
+  # Persists brainglobe atlas downloads across container restarts, same as
+  # docker-compose.yml -- without this a dev restart re-downloads atlases
+  # every time.
+  brainglobe_cache:
