@@ -2,8 +2,10 @@
 
 Why a wrapper:
 
-* Cache atlas instances per-process so repeated lookups don't re-load the
-  annotation volume (hundreds of MB once decompressed).
+* Cache atlas instances per-process so repeated lookups don't re-read the
+  atlas metadata, and hold the decompressed annotation volumes (hundreds of
+  MB to several GB each) in one byte-bounded cache -- see "Who owns the
+  annotation volumes" below.
 * Expose a tiny ``RegionInfo`` record so the rest of PixelMap doesn't
   depend on brainglobe's object model.
 * Keep every network call off the caller's thread, because on the hosted
@@ -26,6 +28,28 @@ supported.  Two properties of that layout shape the code below:
   ~9 MB of compressed chunks, against ~1.3 GB of tiffs under v2.  That is what
   makes baking them into the Docker image cheap and reliable.
 
+Who owns the annotation volumes
+-------------------------------
+Exactly one thing: :data:`_VOLUMES`, a byte-budgeted LRU keyed by atlas name,
+read through :func:`canonical_annotation`.  Everything else holds volumes only
+transiently.  This is deliberate, and worth defending:
+
+* An ``lru_cache`` counts *entries*, not bytes.  ``maxsize=4`` is four
+  38 MB atlases or four 4.8 GB ones (allen_mouse_10um), so it never related to
+  the container's memory limit.  The budget here is in bytes and defaults to
+  half the cgroup limit (``PIXELMAP_ATLAS_CACHE_MB`` overrides it).
+* Two caches with independent LRU orders leak.  ``get_atlas`` and the old
+  ``canonical_annotation`` each evicted on their own schedule; once one dropped
+  an atlas the other still pinned its array (a transposed *view* keeps the
+  base alive), and the next ``ensure_downloaded`` loaded a second copy.
+  brainglobe also caches the array on the atlas object itself, so
+  :func:`_take_annotation` detaches it and ``get_atlas`` only ever holds
+  cheap metadata objects.
+* Dropping a reference is not freeing memory.  glibc keeps freed pages in its
+  arenas -- after clearing every cache the process still sat at 1.2 GB RSS
+  until ``malloc_trim``.  The container limit counts RSS, so every eviction
+  and every load ends with :func:`_memory.release_freed_memory`.
+
 Why the network never runs inline
 ---------------------------------
 The deployed app is a single-process Panel/Bokeh server: a blocking call on
@@ -40,7 +64,10 @@ the one genuinely expensive call onto a worker thread.
 from __future__ import annotations
 
 import functools
+import logging
+import os
 import threading
+from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -52,9 +79,12 @@ from brainglobe_atlasapi.list_atlases import (
     get_downloaded_atlases,
 )
 
+from pixelmap.anatomy import _memory
 from pixelmap.anatomy._registry_snapshot import REGISTRY_SNAPSHOT
 
 _DEFAULT_ATLAS = "allen_mouse_25um"
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -81,10 +111,12 @@ def get_atlas(name: str = _DEFAULT_ATLAS):
     neither is free on a cold cache — see :func:`ensure_downloaded` for
     getting that cost off the event loop.
 
-    The cache is bounded so a server that sees many atlases doesn't hold every
-    annotation volume it has ever decoded.  Nothing else may keep a strong
-    reference to an atlas object, or that bound stops meaning anything (see
-    :func:`_region_info_from_id`).
+    Objects here are metadata only -- manifest, structures table, an S3
+    handle -- a few MB each.  The annotation volume is *not* kept on them:
+    :func:`_take_annotation` detaches it into :data:`_VOLUMES`, the one place
+    volumes live.  Reading ``.annotation`` directly off one of these objects
+    re-materialises the array on the instance, so don't; go through
+    :func:`canonical_annotation`.
     """
     return BrainGlobeAtlas(name, check_latest=False)
 
@@ -96,8 +128,13 @@ def ensure_downloaded(name: str = _DEFAULT_ATLAS) -> None:
     a single place so callers can push it onto a worker thread — which the GUI
     does, because on the server the calling thread also serves every other
     session.  A no-op once the atlas is local.
+
+    Loads into :data:`_VOLUMES` rather than merely touching ``.annotation``:
+    the compute that follows reads the canonical volume, so this is the copy
+    it will use, and touching the attribute instead would leave a second copy
+    cached on the atlas object.
     """
-    _ = get_atlas(name).annotation
+    canonical_annotation(name)
 
 
 @functools.lru_cache(maxsize=1)
@@ -434,7 +471,6 @@ def anatomical_axes(atlas) -> dict[str, _AnatAxis]:
     return axes
 
 
-@functools.lru_cache(maxsize=4)
 def canonical_annotation(atlas_name: str):
     """Return ``(annotation, resolution)`` reoriented to canonical ``(AP, DV, ML)``.
 
@@ -444,11 +480,20 @@ def canonical_annotation(atlas_name: str):
     assumes this layout, so funnelling every atlas through here is what lets
     non-Allen orientations work. For an already-``asr`` atlas this is a no-op
     (identity transpose, no flips), so Allen behavior is unchanged.
+
+    Served from :data:`_VOLUMES`, the byte-bounded cache that is the only
+    long-lived owner of annotation arrays.  Callers get the cached array
+    itself: treat it as read-only.
     """
+    return _VOLUMES.get(atlas_name)
+
+
+def _load_canonical(atlas_name: str):
+    """Materialise ``atlas_name``'s volume in canonical layout (uncached)."""
     atlas = get_atlas(atlas_name)
     axes = anatomical_axes(atlas)
     order = (axes["AP"].array_axis, axes["DV"].array_axis, axes["ML"].array_axis)
-    arr = np.transpose(atlas.annotation, order)
+    arr = np.transpose(_take_annotation(atlas), order)
     flip_axes = tuple(i for i, kind in enumerate(("AP", "DV", "ML")) if axes[kind].flip)
     if flip_axes:
         arr = np.flip(arr, axis=flip_axes)
@@ -456,6 +501,138 @@ def canonical_annotation(atlas_name: str):
         [axes["AP"].res_um, axes["DV"].res_um, axes["ML"].res_um], dtype=float
     )
     return arr, res
+
+
+def _take_annotation(atlas) -> np.ndarray:
+    """Read the atlas's annotation and detach it from the atlas object.
+
+    brainglobe's ``annotation`` property caches the array on the instance
+    (``_annotation``) after the first read.  Left there, ``get_atlas``'s cache
+    becomes a second owner of every volume, with its own eviction order -- the
+    duplicate-copy leak described in the module docstring.  Clearing the slot
+    leaves the object metadata-only again; a later read would simply reload
+    from the local zarr chunks (no network, the chunks are cached).
+
+    Test doubles that expose ``annotation`` as a plain attribute have no slot
+    to clear, and the ``is`` check keeps this from touching anything else.
+    """
+    arr = atlas.annotation
+    if getattr(atlas, "_annotation", None) is arr:
+        atlas._annotation = None
+    return arr
+
+
+def _default_budget_bytes() -> int:
+    """How many bytes of annotation volumes to keep resident.
+
+    ``PIXELMAP_ATLAS_CACHE_MB`` wins.  Otherwise half the cgroup limit: the
+    other half covers the Bokeh baseline (~300 MB) and the transient peak of
+    decoding the next volume (dask holds every decompressed chunk *and* the
+    assembled array at once, ~2x the array).  Outside a container, 2 GB.
+    """
+    env = os.environ.get("PIXELMAP_ATLAS_CACHE_MB")
+    if env:
+        return int(float(env) * 2**20)
+    limit = _memory.cgroup_memory_limit_bytes()
+    if limit is None:
+        return 2 * 2**30
+    return max(limit // 2, 256 * 2**20)
+
+
+class _VolumeCache:
+    """Byte-bounded LRU of canonical annotation volumes.
+
+    The sole long-lived owner of annotation arrays in the process.  Evicts
+    least-recently-used volumes until the total fits ``budget_bytes``, then
+    trims the heap so the eviction actually lowers RSS.  A single volume
+    larger than the whole budget still loads (evicting everything else) --
+    refusing it is a UI decision, not a cache one.
+
+    Loads run outside the lock so the Bokeh event loop can keep answering
+    lookups for a cached atlas while a worker thread decodes another one;
+    concurrent requests for the *same* atlas wait for the first load rather
+    than decoding a second copy.
+    """
+
+    def __init__(self, budget_bytes: int | None = None):
+        self._budget = budget_bytes
+        self._entries: OrderedDict[str, tuple[np.ndarray, np.ndarray]] = OrderedDict()
+        self._lock = threading.Lock()
+        self._loading: dict[str, threading.Event] = {}
+
+    @property
+    def budget_bytes(self) -> int:
+        if self._budget is None:
+            self._budget = _default_budget_bytes()
+        return self._budget
+
+    def resident_bytes(self) -> int:
+        with self._lock:
+            return sum(arr.nbytes for arr, _ in self._entries.values())
+
+    def get(self, name: str):
+        while True:
+            with self._lock:
+                entry = self._entries.get(name)
+                if entry is not None:
+                    self._entries.move_to_end(name)
+                    return entry
+                pending = self._loading.get(name)
+                if pending is None:
+                    pending = self._loading[name] = threading.Event()
+                    break
+            # Someone else is decoding this atlas; wait, then re-check.  If
+            # their load failed the entry is still absent and we try ourselves.
+            pending.wait()
+        try:
+            arr, res = _load_canonical(name)
+        except BaseException:
+            # Waiters must wake either way; with no entry present they retry.
+            with self._lock:
+                del self._loading[name]
+            pending.set()
+            raise
+        return self._insert(name, arr, res, pending)
+
+    def _insert(self, name, arr, res, pending):
+        evicted = []
+        with self._lock:
+            self._entries[name] = (arr, res)
+            self._entries.move_to_end(name)
+            total = sum(a.nbytes for a, _ in self._entries.values())
+            while total > self.budget_bytes and len(self._entries) > 1:
+                old, (old_arr, _) = self._entries.popitem(last=False)
+                total -= old_arr.nbytes
+                evicted.append((old, old_arr.nbytes))
+            del self._loading[name]
+            pending.set()
+        for old, nbytes in evicted:
+            log.info("atlas cache: evicted %s (%d MB) to stay under %d MB",
+                     old, nbytes >> 20, self.budget_bytes >> 20)
+        # Every load leaves dask's decompressed chunks in the heap; every
+        # eviction leaves the array there.  Either way, give it back now.
+        _memory.release_freed_memory()
+        return arr, res
+
+    def evict(self, name: str) -> None:
+        with self._lock:
+            dropped = self._entries.pop(name, None) is not None
+        if dropped:
+            _memory.release_freed_memory()
+
+    def clear(self) -> None:
+        with self._lock:
+            had = bool(self._entries)
+            self._entries.clear()
+        if had:
+            _memory.release_freed_memory()
+
+    # The lru_cache this replaced was cleared as ``canonical_annotation.cache_clear()``.
+    cache_clear = clear
+
+
+_VOLUMES = _VolumeCache()
+canonical_annotation.cache_clear = _VOLUMES.clear  # type: ignore[attr-defined]
 
 
 def volume_center_um(name: str = _DEFAULT_ATLAS) -> tuple[float, float, float]:

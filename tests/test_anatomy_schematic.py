@@ -35,11 +35,9 @@ class _FakeAtlas:
 def _reset_caches():
     atlas_module.get_atlas.cache_clear()
     atlas_module.canonical_annotation.cache_clear()
-    schematic_module._atlas_data.cache_clear()
     yield
     atlas_module.get_atlas.cache_clear()
     atlas_module.canonical_annotation.cache_clear()
-    schematic_module._atlas_data.cache_clear()
 
 
 @pytest.fixture

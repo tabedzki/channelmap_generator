@@ -56,8 +56,11 @@ For production deployments, use **Docker Compose** — see the included `docker-
 **Memory & healthcheck**: point the healthcheck at `/liveness`, never `/app`
 — `/app` builds a full Bokeh session on every probe. Set a container memory
 limit (`deploy.resources.limits.memory` in Compose) so the container, not
-the host, gets restarted under memory pressure. Keep `NUM_PROCS=1` unless
-RAM is sized for multiple copies of every cache. Mount the
+the host, gets restarted under memory pressure; size it at ~300 MB plus
+twice the largest atlas users may compute with (decoding an atlas briefly
+needs ~2x its array). Decoded atlases stay in a cache budgeted at half
+that limit (`PIXELMAP_ATLAS_CACHE_MB` overrides it). Keep `NUM_PROCS=1`
+unless RAM is sized for multiple copies of every cache. Mount the
 `brainglobe_cache` volume so downloaded atlases persist across restarts.
 RSS is logged to stdout every 60 s.
 :::

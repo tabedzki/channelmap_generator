@@ -40,12 +40,18 @@ services:
     restart: unless-stopped
     # Cap container memory so the *container* gets OOM-killed and restarted
     # by Docker's restart policy, not the host. Size as roughly:
-    # ~300 MB base + <= largest atlas you allow users to download + ~6 MB
+    # ~300 MB base + 2 x the largest atlas you allow users to compute with
+    # (decoding holds every decompressed chunk *and* the assembled array at
+    # once: whs_sd_rat_39um is a 1.07 GB array and peaks at +2.1 GB) + ~6 MB
     # per open browser tab.
+    #
+    # The app keeps decoded atlases in a cache budgeted at half this limit
+    # (read from the cgroup), so a larger limit also means fewer re-decodes
+    # when users switch atlases. PIXELMAP_ATLAS_CACHE_MB overrides the budget.
     # deploy:
     #   resources:
     #     limits:
-    #       memory: 2g
+    #       memory: 3g
 
 volumes:
   # Persists brainglobe atlas downloads across container restarts.
