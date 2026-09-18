@@ -21,6 +21,7 @@ import pytest
 
 from pixelmap.anatomy import atlas as atlas_module
 from pixelmap.anatomy import regions as regions_module
+from pixelmap.gui import gui as gui_module
 from pixelmap.gui.gui import ChannelmapGUI
 from pixelmap.types import Electrode
 
@@ -678,6 +679,48 @@ class TestComputeButtonRunsUnderTheDocumentLock:
 
         assert gui.compute_anatomy_button.disabled is False
         assert gui.compute_anatomy_button.name == "Download & compute atlas 🧠 ⏳"
+
+    def test_an_atlas_too_large_for_the_server_is_refused_not_downloaded(
+        self, served, monkeypatch
+    ):
+        """The manifest says how big the decoded volume is; a 4.8 GB atlas on
+        a 3 GB container is refused with a message, not OOM-killed."""
+        gui, session = served
+        monkeypatch.setattr(atlas_module, "is_downloaded", lambda name: False)
+        notices = []
+        monkeypatch.setattr(gui_module, "_notify", lambda level, msg, **kw: notices.append((level, msg)))
+
+        def _too_big(name):
+            raise atlas_module.AtlasTooLarge(name, 4_800 * 2**20, 2_560 * 2**20)
+
+        monkeypatch.setattr(atlas_module, "ensure_downloaded", _too_big)
+
+        asyncio.run(session.with_document_locked(gui._on_compute_anatomy_click, None))
+
+        assert gui.compute_anatomy_button.disabled is False
+        assert gui.compute_anatomy_button.name == "Download & compute atlas 🧠 ⏳"
+        assert len(gui.region_band_source.data["acronym"]) == 0, "nothing was computed"
+        assert notices and notices[0][0] == "error"
+        assert "4,800 MB" in notices[0][1] and "2,560 MB" in notices[0][1]
+
+    def test_a_too_large_atlas_already_on_disk_is_refused_at_compute(
+        self, served, monkeypatch
+    ):
+        gui, _session = served
+        monkeypatch.setattr(atlas_module, "is_downloaded", lambda name: True)
+        notices = []
+        monkeypatch.setattr(gui_module, "_notify", lambda level, msg, **kw: notices.append((level, msg)))
+        monkeypatch.setattr(
+            atlas_module, "max_annotation_bytes", lambda: 1,  # nothing fits
+        )
+        monkeypatch.setattr(atlas_module, "annotation_nbytes", lambda name: 2)
+        atlas_module.canonical_annotation.cache_clear()
+
+        gui.compute_anatomy_overlay()
+
+        assert gui.compute_anatomy_button.disabled is False
+        assert len(gui.region_band_source.data["acronym"]) == 0
+        assert notices and notices[0][0] == "error"
 
 
 def test_no_unlocked_async_gui_callbacks():

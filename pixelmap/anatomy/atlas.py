@@ -26,6 +26,18 @@ supported.  Two properties of that layout shape the code below:
   ~9 MB of compressed chunks, against ~1.3 GB of tiffs under v2.  That is what
   makes baking them into the Docker image cheap and reliable.
 
+Why some atlases are refused outright
+-------------------------------------
+The annotation is one dense ``uint32`` array: allen_mouse_25um is 308 MB,
+whs_sd_rat_39um 1.07 GB, and any of the 10 µm mouse atlases 4.8 GB.  On a
+container capped at 3 GB the last of those cannot be decoded at all -- the
+process is OOM-killed, Docker restarts it, and the next user who picks the
+same atlas kills it again.  The array's size is known from the manifest
+(``shape``) before a single chunk is fetched, so :func:`check_fits` compares
+it with the cap and raises :class:`AtlasTooLarge` first; the GUI turns that
+into a message instead of a dead server.  ``PIXELMAP_MAX_ATLAS_MB`` overrides
+the derived limit; with no cgroup cap and no override nothing is refused.
+
 Why the network never runs inline
 ---------------------------------
 The deployed app is a single-process Panel/Bokeh server: a blocking call on
@@ -40,18 +52,24 @@ the one genuinely expensive call onto a worker thread.
 from __future__ import annotations
 
 import functools
+import os
 import threading
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 from brainglobe_atlasapi import BrainGlobeAtlas
-from brainglobe_atlasapi.descriptors import V3_ANNOTATION_NAME, V3_ATLAS_ROOTDIR
+from brainglobe_atlasapi.descriptors import (
+    ANNOTATION_DTYPE,
+    V3_ANNOTATION_NAME,
+    V3_ATLAS_ROOTDIR,
+)
 from brainglobe_atlasapi.list_atlases import (
     get_all_atlases_lastversions,
     get_downloaded_atlases,
 )
 
+from pixelmap.anatomy import _memory
 from pixelmap.anatomy._registry_snapshot import REGISTRY_SNAPSHOT
 
 _DEFAULT_ATLAS = "allen_mouse_25um"
@@ -96,8 +114,74 @@ def ensure_downloaded(name: str = _DEFAULT_ATLAS) -> None:
     a single place so callers can push it onto a worker thread — which the GUI
     does, because on the server the calling thread also serves every other
     session.  A no-op once the atlas is local.
+
+    Raises :class:`AtlasTooLarge` before fetching anything bulky if the
+    decoded volume would not fit the process's memory cap.
     """
+    check_fits(name)
     _ = get_atlas(name).annotation
+
+
+class AtlasTooLarge(RuntimeError):
+    """The atlas's annotation volume exceeds what this process may decode."""
+
+    def __init__(self, name: str, nbytes: int, limit: int):
+        self.name, self.nbytes, self.limit = name, nbytes, limit
+        super().__init__(
+            f"{name}'s annotation is {nbytes / 2**20:,.0f} MB decoded; this "
+            f"server allows at most {limit / 2**20:,.0f} MB per atlas"
+        )
+
+
+def annotation_nbytes(name: str = _DEFAULT_ATLAS) -> int | None:
+    """Decoded size of the atlas's annotation array, from metadata alone.
+
+    brainglobe publishes ``shape`` in the manifest and stores annotations as
+    ``uint32``, so the size is known without fetching a chunk.  ``None`` when
+    the atlas carries no shape (test doubles), which callers treat as "no
+    opinion" rather than "fits".
+    """
+    shape = getattr(get_atlas(name), "shape", None)
+    if shape is None:
+        return None
+    return int(np.prod([int(s) for s in shape])) * np.dtype(ANNOTATION_DTYPE).itemsize
+
+
+# What the rest of the process needs regardless of atlas: the Bokeh/Panel
+# baseline (~300 MB measured) plus headroom for sessions and the metadata
+# caches.
+_PROCESS_BASELINE_BYTES = 512 * 2**20
+
+
+def max_annotation_bytes() -> int | None:
+    """The largest annotation volume this process may decode, or ``None``.
+
+    ``PIXELMAP_MAX_ATLAS_MB`` wins.  Otherwise the cgroup memory cap minus the
+    process baseline: what's left is what one decoded volume may occupy.
+    ``None`` -- no cap, nothing refused -- outside a container.
+    """
+    env = os.environ.get("PIXELMAP_MAX_ATLAS_MB")
+    if env:
+        return int(float(env) * 2**20)
+    limit = _memory.cgroup_memory_limit_bytes()
+    if limit is None:
+        return None
+    return max(limit - _PROCESS_BASELINE_BYTES, 0)
+
+
+def check_fits(name: str = _DEFAULT_ATLAS) -> None:
+    """Raise :class:`AtlasTooLarge` if ``name`` cannot be decoded under the cap.
+
+    Needs the manifest, which :func:`get_atlas` fetches on a cold cache, so
+    call it where a small network round-trip is acceptable (the worker thread
+    that would download the atlas anyway) or after :func:`is_downloaded`.
+    """
+    limit = max_annotation_bytes()
+    if limit is None:
+        return
+    nbytes = annotation_nbytes(name)
+    if nbytes is not None and nbytes > limit:
+        raise AtlasTooLarge(name, nbytes, limit)
 
 
 @functools.lru_cache(maxsize=1)
@@ -445,6 +529,7 @@ def canonical_annotation(atlas_name: str):
     non-Allen orientations work. For an already-``asr`` atlas this is a no-op
     (identity transpose, no flips), so Allen behavior is unchanged.
     """
+    check_fits(atlas_name)
     atlas = get_atlas(atlas_name)
     axes = anatomical_axes(atlas)
     order = (axes["AP"].array_axis, axes["DV"].array_axis, axes["ML"].array_axis)
