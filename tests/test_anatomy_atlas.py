@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import gc
 import weakref
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -268,6 +269,18 @@ class TestIsDownloaded:
         )
         assert atlas_module.is_downloaded("x") is True
 
+    def test_another_resolution_of_the_family_does_not_count(
+        self, monkeypatch, listed, tmp_path
+    ):
+        """allen_mouse_25um and allen_mouse_10um share one annotation set:
+        25 µm is level s1, 10 µm is s0. With only s1 local, the 10 µm atlas
+        is *not* downloaded -- its level is a 4.8 GB fetch away."""
+        monkeypatch.setattr(
+            atlas_module, "get_atlas",
+            lambda name: _v3_atlas(tmp_path, chunks=True, resolution=(10.0,) * 3),
+        )
+        assert atlas_module.is_downloaded("x") is False
+
     def test_unreadable_metadata_reports_not_downloaded(self, monkeypatch, listed):
         """A half-written manifest must send callers down the "this will cost
         you" path rather than crashing the GUI."""
@@ -279,22 +292,22 @@ class TestIsDownloaded:
         assert atlas_module.is_downloaded("x") is False
 
 
-def _v3_atlas(root, *, chunks: bool):
-    """A stand-in for a v3 atlas whose OME-Zarr chunks may or may not be local."""
-    annotation_dir = root / "annotation-sets" / "some-annotation" / "1_0"
-    # brainglobe names pyramid levels s0, s1, ...; the level a given atlas
-    # pulls depends on its resolution, so the check accepts any of them.
-    scale = annotation_dir / atlas_module.V3_ANNOTATION_NAME / "s1"
-    (scale / "c" if chunks else scale).mkdir(parents=True)
+def _v3_atlas(root, *, chunks: bool, resolution=(25.0, 25.0, 25.0)):
+    """A stand-in for a v3 atlas over a two-level pyramid (s0 @ 10 µm, s1 @
+    25 µm) whose 25 µm chunks may or may not be local."""
+    import shutil
 
-    class _A:
-        root_dir = root
-        metadata = {
-            # brainglobe stores locations with a leading "/" that it strips.
-            "annotation_set": {"location": "/annotation-sets/some-annotation/1_0"}
-        }
-
-    return _A()
+    atlas = _DiskAtlas(root, resolution=resolution)
+    _write_pyramid(atlas.pyramid_root, {
+        "s0": ((10.0,) * 3, np.zeros((1, 1, 1), np.uint32)),
+        "s1": ((25.0,) * 3, np.ones((2, 2, 2), np.uint32)),
+    })
+    # s0's chunks are never local (all-zero chunks aren't even written); drop
+    # s1's unless the test wants them.
+    shutil.rmtree(atlas.pyramid_root / "s0" / "c", ignore_errors=True)
+    if not chunks:
+        shutil.rmtree(atlas.pyramid_root / "s1" / "c")
+    return atlas
 
 
 class TestRegistryCachePath:
@@ -377,6 +390,10 @@ class TestEnsureDownloaded:
         class _A:
             def __init__(self, name, **_kwargs):
                 self.name = name
+                self.orientation = "asr"
+                self.resolution = (25.0, 25.0, 25.0)
+                self.shape = (2, 2, 2)
+                self.structures = {}
 
             @property
             def annotation(self):
@@ -386,6 +403,151 @@ class TestEnsureDownloaded:
         monkeypatch.setattr(atlas_module, "BrainGlobeAtlas", _A)
         atlas_module.ensure_downloaded("some_atlas")
         assert reads == ["some_atlas"]
+        # ...and the decoded volume is the one the overlay will read: no
+        # second decode when the compute follows.
+        atlas_module.canonical_annotation("some_atlas")
+        assert reads == ["some_atlas"]
+
+
+def _write_pyramid(root, levels, chunks=(2, 2, 2)):
+    """Build a tiny OME-Zarr pyramid like brainglobe v3 ships: one group with
+    ``ome.multiscales`` and a uint32 array per level. ``levels`` maps a dataset
+    path to ``(scale_um, array)``."""
+    import zarr
+
+    group = zarr.open_group(root, mode="w")
+    datasets = []
+    for path, (scale_um, arr) in levels.items():
+        z = group.create_array(path, shape=arr.shape, chunks=chunks, dtype="uint32")
+        z[:] = arr
+        datasets.append({
+            "path": path,
+            "coordinateTransformations": [
+                {"type": "scale", "scale": [s / 1000.0 for s in scale_um]},
+                {"type": "translation", "translation": [0.0, 0.0, 0.0]},
+            ],
+        })
+    group.attrs["ome"] = {"multiscales": [{"datasets": datasets}]}
+    return root
+
+
+class _DiskAtlas:
+    """A brainglobe-v3-shaped atlas over a pyramid written by ``_write_pyramid``.
+
+    ``annotation`` raises so the tests prove the loader never takes dask's
+    path; ``fs`` records what a download would fetch."""
+
+    def __init__(self, tmp_path, resolution=(25.0, 25.0, 25.0)):
+        self.root_dir = tmp_path
+        self.metadata = {"annotation_set": {"location": "/annotation-sets/x"}}
+        self.resolution = resolution
+        self.orientation = "asr"
+        self.structures = {}
+        self.fetched = []
+        self.fs = self
+
+    def get(self, remote, local, recursive=False):  # fsspec-shaped
+        self.fetched.append((remote, local))
+
+    @property
+    def annotation(self):
+        raise AssertionError("must decode through zarr, not brainglobe's dask path")
+
+    @property
+    def pyramid_root(self):
+        return self.root_dir / "annotation-sets" / "x" / atlas_module.V3_ANNOTATION_NAME
+
+
+class TestLoadAnnotation:
+    """``load_annotation`` decodes straight from the zarr chunks.
+
+    brainglobe's ``annotation`` property computes a dask graph that holds every
+    decompressed chunk alongside the assembled array (2x the volume at peak:
+    2.3 GB for the 1.07 GB rat atlas). Reading the level through zarr
+    indexing keeps the peak at the array itself.
+    """
+
+    def test_reads_the_level_matching_the_atlas_resolution(self, tmp_path):
+        atlas = _DiskAtlas(tmp_path, resolution=(50.0, 50.0, 50.0))
+        fine = np.arange(64, dtype=np.uint32).reshape(4, 4, 4)
+        coarse = np.full((2, 2, 2), 7, dtype=np.uint32)
+        _write_pyramid(atlas.pyramid_root, {"s0": ((25.0,) * 3, fine), "s1": ((50.0,) * 3, coarse)})
+        out = atlas_module.load_annotation(atlas)
+        assert out.dtype == np.uint32 and out.shape == (2, 2, 2)
+        assert (out == 7).all()
+        assert atlas.fetched == [], "chunks were local: no download"
+
+    def test_returns_a_plain_array_not_a_lazy_view(self, tmp_path):
+        atlas = _DiskAtlas(tmp_path)
+        _write_pyramid(atlas.pyramid_root, {"s0": ((25.0,) * 3, np.ones((4, 4, 4), np.uint32))})
+        out = atlas_module.load_annotation(atlas)
+        assert isinstance(out, np.ndarray) and out.flags.owndata
+
+    def test_downloads_the_level_when_chunks_are_missing(self, tmp_path):
+        import shutil
+
+        atlas = _DiskAtlas(tmp_path)
+        arr = np.arange(64, dtype=np.uint32).reshape(4, 4, 4)
+        _write_pyramid(atlas.pyramid_root, {"s0": ((25.0,) * 3, arr)})
+        level = atlas.pyramid_root / "s0"
+        # Stash the chunks so a "download" can restore them.
+        stash = tmp_path / "remote"
+        shutil.move(level / "c", stash)
+
+        def _fetch(remote, local, recursive=False):
+            atlas.fetched.append((remote, local))
+            shutil.copytree(stash, Path(local) / "c")
+            shutil.copy(level / "zarr.json", Path(local) / "zarr.json")
+
+        atlas.get = _fetch
+        out = atlas_module.load_annotation(atlas)
+        name = atlas_module.V3_ANNOTATION_NAME
+        staging = level.with_name("s0.partial")
+        assert atlas.fetched == [
+            (f"s3://brainglobe/atlas/annotation-sets/x/{name}/s0/", str(staging))
+        ]
+        np.testing.assert_array_equal(out, arr)
+        assert (level / "c").is_dir() and not staging.exists()
+
+    def test_a_killed_download_leaves_no_chunk_dir_behind(self, tmp_path):
+        """The `c` directory is the only "downloaded" signal; a partial one
+        would be trusted forever and read back as a truncated atlas."""
+        import shutil
+
+        atlas = _DiskAtlas(tmp_path)
+        arr = np.arange(64, dtype=np.uint32).reshape(4, 4, 4)
+        _write_pyramid(atlas.pyramid_root, {"s0": ((25.0,) * 3, arr)})
+        level = atlas.pyramid_root / "s0"
+        stash = tmp_path / "remote"
+        shutil.move(level / "c", stash)
+        attempts = []
+
+        def _fetch(remote, local, recursive=False):
+            attempts.append(local)
+            if len(attempts) == 1:
+                # Half the chunks land, then the process dies.
+                (Path(local) / "c" / "0" / "0").mkdir(parents=True)
+                (Path(local) / "c" / "0" / "0" / "0").write_bytes(b"partial")
+                raise KeyboardInterrupt("OOM-killed mid-transfer")
+            shutil.copytree(stash, Path(local) / "c")
+
+        atlas.get = _fetch
+        with pytest.raises(KeyboardInterrupt):
+            atlas_module.load_annotation(atlas)
+        assert not (level / "c").exists(), "partial download must not look complete"
+        # Next attempt discards the stale staging dir and fetches again.
+        np.testing.assert_array_equal(atlas_module.load_annotation(atlas), arr)
+        assert len(attempts) == 2
+
+    def test_unknown_resolution_is_an_error_not_a_silent_level(self, tmp_path):
+        atlas = _DiskAtlas(tmp_path, resolution=(10.0, 10.0, 10.0))
+        _write_pyramid(atlas.pyramid_root, {"s0": ((25.0,) * 3, np.ones((2, 2, 2), np.uint32))})
+        with pytest.raises(ValueError, match="10.0"):
+            atlas_module.load_annotation(atlas)
+
+    def test_doubles_without_a_zarr_are_read_as_is(self):
+        out = atlas_module.load_annotation(_FakeAtlas("x"))
+        assert out.shape == (4, 4, 4)
 
 
 class TestAtlasesAreReleased:

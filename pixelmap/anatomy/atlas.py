@@ -25,6 +25,12 @@ supported.  Two properties of that layout shape the code below:
 * Atlases are small on disk: allen_mouse_25um and whs_sd_rat_39um together are
   ~9 MB of compressed chunks, against ~1.3 GB of tiffs under v2.  That is what
   makes baking them into the Docker image cheap and reliable.
+* brainglobe decodes ``annotation`` through dask (``.data.compute()``), which
+  holds every decompressed chunk *and* the assembled array at once: the
+  1.07 GB rat volume peaks at +2.1 GB RSS, and a 4.8 GB 10 µm volume would
+  need ~10 GB.  :func:`load_annotation` reads the same chunks straight through
+  zarr into one preallocated array instead (peak ≈ the array itself, and about
+  twice as fast), so nothing here goes through ``atlas.annotation``.
 
 Why the network never runs inline
 ---------------------------------
@@ -40,13 +46,20 @@ the one genuinely expensive call onto a worker thread.
 from __future__ import annotations
 
 import functools
+import os
+import shutil
 import threading
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import zarr
 from brainglobe_atlasapi import BrainGlobeAtlas
-from brainglobe_atlasapi.descriptors import V3_ANNOTATION_NAME, V3_ATLAS_ROOTDIR
+from brainglobe_atlasapi.descriptors import (
+    V3_ANNOTATION_NAME,
+    V3_ATLAS_ROOTDIR,
+    remote_url_s3,
+)
 from brainglobe_atlasapi.list_atlases import (
     get_all_atlases_lastversions,
     get_downloaded_atlases,
@@ -96,8 +109,99 @@ def ensure_downloaded(name: str = _DEFAULT_ATLAS) -> None:
     a single place so callers can push it onto a worker thread — which the GUI
     does, because on the server the calling thread also serves every other
     session.  A no-op once the atlas is local.
+
+    Loads into the same cache the overlay compute reads from, so the volume
+    decoded here is the one used afterwards rather than a throwaway copy.
     """
-    _ = get_atlas(name).annotation
+    canonical_annotation(name)
+
+
+def load_annotation(atlas) -> np.ndarray:
+    """Decode ``atlas``'s annotation volume into memory, at ~1x its size.
+
+    The drop-in for ``atlas.annotation``.  brainglobe's property builds the
+    array with ``dask.compute()``, which decompresses every chunk into its own
+    buffer and only then concatenates them -- so the process briefly holds two
+    copies of the volume (measured: 2.3 GB peak for the 1.07 GB rat atlas).
+    Reading the level through zarr's own indexing decodes chunk by chunk into
+    one preallocated array; the peak is the array plus a chunk.
+
+    Fetches the level from S3 first if its chunks aren't local -- the same
+    ``fs.get`` brainglobe's property makes, without the decode that follows
+    it, and staged so a killed download can't pass for a finished one (see
+    :func:`_download_level`).  This is the one blocking call in the module;
+    see :func:`ensure_downloaded`.
+
+    Test doubles that carry ``annotation`` as a plain attribute have no zarr
+    on disk and are read as-is.
+    """
+    if not hasattr(atlas, "root_dir") or not hasattr(atlas, "metadata"):
+        return np.asarray(atlas.annotation)
+    location, root = _annotation_root(atlas)
+    dataset = _pyramid_dataset(root, atlas.resolution)
+    level = root / dataset
+    if not (level / "c").is_dir():
+        _download_level(
+            atlas.fs,
+            remote_url_s3.format(f"{location}/{V3_ANNOTATION_NAME}/{dataset}/"),
+            level,
+        )
+    return zarr.open_array(level, mode="r")[:]
+
+
+def _annotation_root(atlas) -> tuple[str, Path]:
+    """``(location, path)`` of the atlas's OME-Zarr annotation pyramid on disk.
+
+    ``location`` is the S3-relative key brainglobe stores (leading ``/``
+    stripped); the same annotation set is shared by every resolution of an
+    atlas family, with one pyramid level per resolution.
+    """
+    location = atlas.metadata["annotation_set"]["location"][1:]
+    return location, Path(atlas.root_dir) / location / V3_ANNOTATION_NAME
+
+
+def _download_level(fs, remote: str, level: Path) -> None:
+    """Fetch a pyramid level so that ``level/c`` exists only once it is complete.
+
+    ``fs.get`` writes chunk files one at a time.  A container OOM-killed
+    mid-transfer -- which a large atlas is exactly the thing to cause --
+    leaves a ``c`` directory holding some of the chunks, and that directory
+    is the *only* signal both this loader and brainglobe use for "already
+    downloaded".  Nothing re-fetches, and zarr silently reads every missing
+    chunk as fill value (0, "outside the brain"): a truncated atlas that looks
+    fine.  A chunk count can't catch it either, because a complete download
+    legitimately omits all-zero chunks (the rat atlas ships 217 of 512).
+
+    So fetch into a sibling staging directory and move the finished tree
+    into place with a rename, which is atomic on the same filesystem: ``c``
+    is either whole or absent.  A stale staging dir from an earlier kill is
+    just discarded.
+    """
+    staging = level.with_name(level.name + ".partial")
+    shutil.rmtree(staging, ignore_errors=True)
+    fs.get(remote, str(staging), recursive=True)
+    level.mkdir(parents=True, exist_ok=True)
+    for item in staging.iterdir():
+        target = level / item.name
+        if item.name == "c" or not target.exists():
+            os.replace(item, target)
+    shutil.rmtree(staging, ignore_errors=True)
+
+
+def _pyramid_dataset(root: Path, resolution_um) -> str:
+    """Path (within the OME-Zarr pyramid at ``root``) of the level at ``resolution_um``.
+
+    Matched the way brainglobe picks its level: the dataset whose ``scale``
+    transform (in mm) equals the atlas resolution.  Reads only ``zarr.json``.
+    """
+    attrs = zarr.open_group(root, mode="r").attrs
+    multiscales = (attrs.get("ome") or attrs)["multiscales"][0]
+    want = np.asarray(resolution_um, dtype=float) / 1000.0
+    for dataset in multiscales["datasets"]:
+        for transform in dataset.get("coordinateTransformations", ()):
+            if transform.get("type") == "scale" and np.allclose(transform["scale"][-3:], want):
+                return str(dataset["path"])
+    raise ValueError(f"no pyramid level at {tuple(resolution_um)} µm under {root}")
 
 
 @functools.lru_cache(maxsize=1)
@@ -212,20 +316,25 @@ def is_downloaded(name: str = _DEFAULT_ATLAS) -> bool:
 
 
 def _annotation_is_cached(atlas) -> bool:
-    """True if the lazily-fetched annotation chunks are already local.
+    """True if the chunks for *this atlas's* pyramid level are already local.
 
     Mirrors the check ``core.Atlas.annotation`` makes before hitting S3: the
     OME-Zarr pyramid holds one directory per scale level, and a level's voxels
-    live under ``<level>/c``.  We accept *any* cached level rather than
-    reaching into brainglobe's private ``_annotation_pyramid_level`` — the
-    atlas name pins the resolution, so the only level this app ever pulls is
-    the one it would read back.
+    live under ``<level>/c``.  It has to be the level this atlas reads, not
+    any level: one annotation set serves a whole family, so with
+    allen_mouse_25um cached (level ``s1``) the pyramid directory already
+    exists and ``allen_mouse_10um`` -- ``s0``, a 4.8 GB volume with nothing
+    local -- would otherwise report as downloaded.  The GUI then took its
+    "free" path, and the download ran inline on the event loop.
     """
-    location = atlas.metadata["annotation_set"]["location"][1:]
-    root = Path(atlas.root_dir) / location / V3_ANNOTATION_NAME
+    _, root = _annotation_root(atlas)
     if not root.is_dir():
         return False
-    return any(level.joinpath("c").is_dir() for level in root.iterdir() if level.is_dir())
+    try:
+        dataset = _pyramid_dataset(root, atlas.resolution)
+    except (ValueError, KeyError, FileNotFoundError):
+        return False
+    return (root / dataset / "c").is_dir()
 
 
 def origin_corner(name: str = _DEFAULT_ATLAS) -> str:
@@ -448,7 +557,7 @@ def canonical_annotation(atlas_name: str):
     atlas = get_atlas(atlas_name)
     axes = anatomical_axes(atlas)
     order = (axes["AP"].array_axis, axes["DV"].array_axis, axes["ML"].array_axis)
-    arr = np.transpose(atlas.annotation, order)
+    arr = np.transpose(load_annotation(atlas), order)
     flip_axes = tuple(i for i, kind in enumerate(("AP", "DV", "ML")) if axes[kind].flip)
     if flip_axes:
         arr = np.flip(arr, axis=flip_axes)
