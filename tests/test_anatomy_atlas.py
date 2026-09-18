@@ -13,6 +13,7 @@ import weakref
 import numpy as np
 import pytest
 
+from pixelmap.anatomy import _memory
 from pixelmap.anatomy import atlas as atlas_module
 from pixelmap.anatomy import regions as regions_module
 from pixelmap.anatomy._registry_snapshot import REGISTRY_SNAPSHOT
@@ -370,22 +371,186 @@ class TestListAtlasesNeverBlocks:
         assert atlas_module._registry_from_disk() is None
 
 
+def _lazy_atlas_cls(shape=(2, 2, 2), reads=None):
+    """A fake that mimics brainglobe v3: ``annotation`` is a property that
+    materialises the array on first read and caches it on ``_annotation``."""
+    reads = [] if reads is None else reads
+
+    class _A:
+        def __init__(self, name, **_kwargs):
+            self.name = name
+            self.orientation = "asr"
+            self.resolution = (25.0, 25.0, 25.0)
+            self.shape = shape
+            self.structures = {}
+            self._annotation = None
+
+        @property
+        def annotation(self):
+            if self._annotation is None:
+                reads.append(self.name)
+                self._annotation = np.ones(shape, np.uint32)
+            return self._annotation
+
+    return _A
+
+
 class TestEnsureDownloaded:
     def test_materialises_the_annotation(self, monkeypatch):
         reads = []
-
-        class _A:
-            def __init__(self, name, **_kwargs):
-                self.name = name
-
-            @property
-            def annotation(self):
-                reads.append(self.name)
-                return np.zeros((2, 2, 2), np.int32)
-
-        monkeypatch.setattr(atlas_module, "BrainGlobeAtlas", _A)
+        monkeypatch.setattr(atlas_module, "BrainGlobeAtlas", _lazy_atlas_cls(reads=reads))
         atlas_module.ensure_downloaded("some_atlas")
         assert reads == ["some_atlas"]
+
+    def test_loads_the_copy_the_overlay_will_use(self, monkeypatch):
+        # The worker-thread download and the later compute must share one
+        # array, not decode the volume twice.
+        reads = []
+        monkeypatch.setattr(atlas_module, "BrainGlobeAtlas", _lazy_atlas_cls(reads=reads))
+        atlas_module.ensure_downloaded("some_atlas")
+        atlas_module.canonical_annotation("some_atlas")
+        atlas_module.lookup_regions("some_atlas", np.array([[25.0, 25.0, 25.0]]))
+        assert reads == ["some_atlas"]
+
+
+class TestVolumeCache:
+    """:data:`_VOLUMES` is the only long-lived owner of annotation arrays.
+
+    Regression tests for the second production OOM: ``get_atlas`` and
+    ``canonical_annotation`` were separate ``lru_cache``s with separate
+    eviction orders, and brainglobe caches the array on the atlas object too.
+    Evict one, and the other still pinned the volume; reload, and a second
+    copy appeared.  Meanwhile ``maxsize=4`` bounded a *count*, not bytes.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _no_trim(self, monkeypatch):
+        # malloc_trim is real and harmless, but keep the tests about ownership.
+        monkeypatch.setattr(_memory, "release_freed_memory", lambda: None)
+
+    @staticmethod
+    def _budget(monkeypatch, nbytes):
+        monkeypatch.setattr(atlas_module._VOLUMES, "_budget", nbytes)
+
+    def test_annotation_is_detached_from_the_atlas_object(self, monkeypatch):
+        monkeypatch.setattr(atlas_module, "BrainGlobeAtlas", _lazy_atlas_cls())
+        arr, _ = atlas_module.canonical_annotation("x")
+        atlas = atlas_module.get_atlas("x")
+        assert atlas._annotation is None, "get_atlas must hold metadata only"
+        assert arr.base is not None and arr.base.shape == (2, 2, 2)
+
+    def test_evicting_the_atlas_object_does_not_reload_the_volume(self, monkeypatch):
+        reads = []
+        monkeypatch.setattr(atlas_module, "BrainGlobeAtlas", _lazy_atlas_cls(reads=reads))
+        before, _ = atlas_module.canonical_annotation("x")
+        atlas_module.get_atlas.cache_clear()          # the old duplicate-copy trigger
+        atlas_module.ensure_downloaded("x")
+        after, _ = atlas_module.canonical_annotation("x")
+        assert after is before
+        assert reads == ["x"]
+
+    def test_evicts_by_bytes_not_by_count(self, monkeypatch):
+        cls = _lazy_atlas_cls(shape=(4, 4, 4))       # 256 B per volume
+        monkeypatch.setattr(atlas_module, "BrainGlobeAtlas", cls)
+        self._budget(monkeypatch, 3 * 256)
+        for name in "abcde":                          # 5 loads, budget fits 3
+            atlas_module.canonical_annotation(name)
+        assert list(atlas_module._VOLUMES._entries) == ["c", "d", "e"]
+        assert atlas_module._VOLUMES.resident_bytes() == 3 * 256
+
+    def test_recent_use_protects_from_eviction(self, monkeypatch):
+        cls = _lazy_atlas_cls(shape=(4, 4, 4))
+        monkeypatch.setattr(atlas_module, "BrainGlobeAtlas", cls)
+        self._budget(monkeypatch, 2 * 256)
+        atlas_module.canonical_annotation("a")
+        atlas_module.canonical_annotation("b")
+        atlas_module.canonical_annotation("a")        # touch a: b is now oldest
+        atlas_module.canonical_annotation("c")
+        assert list(atlas_module._VOLUMES._entries) == ["a", "c"]
+
+    def test_a_volume_larger_than_the_budget_still_loads(self, monkeypatch):
+        cls = _lazy_atlas_cls(shape=(4, 4, 4))
+        monkeypatch.setattr(atlas_module, "BrainGlobeAtlas", cls)
+        self._budget(monkeypatch, 10)
+        atlas_module.canonical_annotation("a")
+        atlas_module.canonical_annotation("b")
+        # Refusing an oversized atlas is the GUI's call; the cache just keeps
+        # only the one that's in use.
+        assert list(atlas_module._VOLUMES._entries) == ["b"]
+
+    def test_eviction_releases_freed_memory(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(_memory, "release_freed_memory", lambda: calls.append(1))
+        monkeypatch.setattr(atlas_module, "BrainGlobeAtlas", _lazy_atlas_cls())
+        atlas_module.canonical_annotation("a")        # trim after every load
+        atlas_module.canonical_annotation("a")        # cache hit: no trim
+        n = len(calls)
+        atlas_module._VOLUMES.clear()
+        assert n == 1 and len(calls) == 2
+
+    def test_failed_load_does_not_wedge_later_callers(self, monkeypatch):
+        calls = []
+
+        def _flaky(name):
+            calls.append(name)
+            if len(calls) == 1:
+                raise RuntimeError("s3 hiccup")
+            return np.ones((2, 2, 2), np.uint32), np.array([25.0, 25.0, 25.0])
+
+        monkeypatch.setattr(atlas_module, "_load_canonical", _flaky)
+        with pytest.raises(RuntimeError):
+            atlas_module.canonical_annotation("x")
+        assert "x" not in atlas_module._VOLUMES._loading
+        arr, _ = atlas_module.canonical_annotation("x")
+        assert arr.shape == (2, 2, 2)
+
+    def test_concurrent_requests_decode_once(self, monkeypatch):
+        import threading
+
+        started = threading.Event()
+        release = threading.Event()
+        loads = []
+
+        def _slow(name):
+            loads.append(name)
+            started.set()
+            release.wait(5)
+            return np.ones((2, 2, 2), np.uint32), np.array([25.0, 25.0, 25.0])
+
+        monkeypatch.setattr(atlas_module, "_load_canonical", _slow)
+        results = []
+        t1 = threading.Thread(target=lambda: results.append(atlas_module.canonical_annotation("x")[0]))
+        t1.start()
+        started.wait(5)
+        t2 = threading.Thread(target=lambda: results.append(atlas_module.canonical_annotation("x")[0]))
+        t2.start()
+        release.set()
+        t1.join(5); t2.join(5)
+        assert loads == ["x"]
+        assert len(results) == 2 and results[0] is results[1]
+
+
+class TestBudgetDefaults:
+    def test_env_override_wins(self, monkeypatch):
+        monkeypatch.setenv("PIXELMAP_ATLAS_CACHE_MB", "512")
+        assert atlas_module._default_budget_bytes() == 512 * 2**20
+
+    def test_half_the_cgroup_limit(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("PIXELMAP_ATLAS_CACHE_MB", raising=False)
+        f = tmp_path / "memory.max"
+        f.write_text("3221225472\n")                 # a 3 GB `deploy` limit
+        monkeypatch.setattr(_memory, "_CGROUP_LIMIT_FILES", (str(f),))
+        assert atlas_module._default_budget_bytes() == 3221225472 // 2
+
+    def test_unlimited_cgroup_means_2gb(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("PIXELMAP_ATLAS_CACHE_MB", raising=False)
+        v2 = tmp_path / "memory.max"; v2.write_text("max\n")
+        v1 = tmp_path / "limit"; v1.write_text(str(2**63 - 4096) + "\n")
+        assert _memory.cgroup_memory_limit_bytes((str(v2),)) is None
+        assert _memory.cgroup_memory_limit_bytes((str(v1),)) is None
+        assert _memory.cgroup_memory_limit_bytes((str(tmp_path / "missing"),)) is None
+        monkeypatch.setattr(_memory, "_CGROUP_LIMIT_FILES", (str(v2), str(v1)))
+        assert atlas_module._default_budget_bytes() == 2 * 2**30
 
 
 class TestAtlasesAreReleased:
