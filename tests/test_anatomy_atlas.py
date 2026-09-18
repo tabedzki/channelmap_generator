@@ -13,6 +13,7 @@ import weakref
 import numpy as np
 import pytest
 
+from pixelmap.anatomy import _memory
 from pixelmap.anatomy import atlas as atlas_module
 from pixelmap.anatomy import regions as regions_module
 from pixelmap.anatomy._registry_snapshot import REGISTRY_SNAPSHOT
@@ -386,6 +387,97 @@ class TestEnsureDownloaded:
         monkeypatch.setattr(atlas_module, "BrainGlobeAtlas", _A)
         atlas_module.ensure_downloaded("some_atlas")
         assert reads == ["some_atlas"]
+
+
+def _sized_atlas_cls(shape):
+    """A metadata-only fake: ``shape`` is published, ``annotation`` must not
+    be read -- the size gate has to decide from the manifest alone."""
+
+    class _A:
+        def __init__(self, name, **_kwargs):
+            self.name = name
+            self.orientation = "asr"
+            self.resolution = (25.0, 25.0, 25.0)
+            self.shape = shape
+            self.structures = {}
+
+        @property
+        def annotation(self):
+            raise AssertionError("a refused atlas must never be decoded")
+
+    return _A
+
+
+class TestSizeGate:
+    """Atlases that cannot fit the memory cap are refused before any decode.
+
+    allen_mouse_10um is a 1320x800x1140 uint32 array: 4.8 GB. Under a 3 GB
+    container cap that decode is an OOM kill, a Docker restart, and another
+    kill the next time anyone picks it. The manifest's ``shape`` says so
+    before a chunk is fetched.
+    """
+
+    ALLEN_10UM = (1320, 800, 1140)
+
+    def test_size_comes_from_the_manifest_shape(self, monkeypatch):
+        monkeypatch.setattr(atlas_module, "BrainGlobeAtlas", _sized_atlas_cls(self.ALLEN_10UM))
+        assert atlas_module.annotation_nbytes("x") == 1320 * 800 * 1140 * 4
+
+    def test_no_shape_means_no_opinion(self, monkeypatch):
+        monkeypatch.setattr(atlas_module, "BrainGlobeAtlas", _FakeAtlas)
+        assert atlas_module.annotation_nbytes("x") is None
+        monkeypatch.setattr(atlas_module, "max_annotation_bytes", lambda: 1)
+        atlas_module.check_fits("x")  # no shape -> not refused
+
+    def test_env_override_sets_the_limit(self, monkeypatch):
+        monkeypatch.setenv("PIXELMAP_MAX_ATLAS_MB", "1024")
+        assert atlas_module.max_annotation_bytes() == 1024 * 2**20
+
+    def test_limit_is_the_cgroup_cap_minus_the_process_baseline(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("PIXELMAP_MAX_ATLAS_MB", raising=False)
+        f = tmp_path / "memory.max"
+        f.write_text("3221225472\n")                 # 3 GB `deploy` limit
+        monkeypatch.setattr(_memory, "_CGROUP_LIMIT_FILES", (str(f),))
+        assert atlas_module.max_annotation_bytes() == 3221225472 - 512 * 2**20
+
+    def test_no_cap_means_nothing_is_refused(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("PIXELMAP_MAX_ATLAS_MB", raising=False)
+        monkeypatch.setattr(_memory, "_CGROUP_LIMIT_FILES", (str(tmp_path / "missing"),))
+        assert atlas_module.max_annotation_bytes() is None
+        monkeypatch.setattr(atlas_module, "BrainGlobeAtlas", _sized_atlas_cls(self.ALLEN_10UM))
+        atlas_module.check_fits("x")
+
+    def test_ensure_downloaded_refuses_before_fetching(self, monkeypatch):
+        monkeypatch.setenv("PIXELMAP_MAX_ATLAS_MB", "2560")
+        monkeypatch.setattr(atlas_module, "BrainGlobeAtlas", _sized_atlas_cls(self.ALLEN_10UM))
+        with pytest.raises(atlas_module.AtlasTooLarge) as info:
+            atlas_module.ensure_downloaded("allen_mouse_10um")
+        assert info.value.name == "allen_mouse_10um"
+        assert "4,592 MB" in str(info.value) and "2,560 MB" in str(info.value)
+
+    def test_every_decode_path_is_gated(self, monkeypatch):
+        # An atlas whose chunks are already on disk is decoded by
+        # canonical_annotation, not ensure_downloaded; it must refuse too.
+        monkeypatch.setenv("PIXELMAP_MAX_ATLAS_MB", "0.5")
+        monkeypatch.setattr(atlas_module, "BrainGlobeAtlas", _sized_atlas_cls((64, 64, 64)))
+        with pytest.raises(atlas_module.AtlasTooLarge):
+            atlas_module.canonical_annotation("x")
+        with pytest.raises(atlas_module.AtlasTooLarge):
+            atlas_module.lookup_regions("x", np.zeros((1, 3)))
+
+    def test_an_atlas_that_fits_is_untouched(self, monkeypatch):
+        monkeypatch.setenv("PIXELMAP_MAX_ATLAS_MB", "2560")
+        monkeypatch.setattr(atlas_module, "BrainGlobeAtlas", _sized_atlas_cls((528, 320, 456)))
+        atlas_module.check_fits("allen_mouse_25um")   # 308 MB: fine
+
+    def test_cgroup_limit_parsing(self, tmp_path):
+        v2 = tmp_path / "memory.max"; v2.write_text("max\n")
+        v1 = tmp_path / "limit"; v1.write_text(str(2**63 - 4096) + "\n")
+        real = tmp_path / "real"; real.write_text("2147483648\n")
+        assert _memory.cgroup_memory_limit_bytes((str(v2),)) is None
+        assert _memory.cgroup_memory_limit_bytes((str(v1),)) is None
+        assert _memory.cgroup_memory_limit_bytes((str(tmp_path / "missing"),)) is None
+        assert _memory.cgroup_memory_limit_bytes((str(real),)) == 2**31
 
 
 class TestAtlasesAreReleased:

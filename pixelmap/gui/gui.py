@@ -1246,6 +1246,13 @@ class ChannelmapGUI(param.Parameterized):
         self.compute_anatomy_button.disabled = True
         try:
             await asyncio.to_thread(anatomy_atlas.ensure_downloaded, name)
+        except anatomy_atlas.AtlasTooLarge as exc:
+            # Known from the manifest before any chunk was fetched: refusing
+            # here is what keeps a 4.8 GB atlas from OOM-killing the server.
+            print(f"Atlas refused: {exc}")
+            self.compute_anatomy_button.name = "Download & compute atlas 🧠 ⏳"
+            _notify("error", f"{exc}. Pick a coarser resolution of this atlas.")
+            return
         except Exception as exc:
             print(f"Atlas download failed: {exc}")
             self.compute_anatomy_button.name = "Download & compute atlas 🧠 ⏳"
@@ -1288,6 +1295,14 @@ class ChannelmapGUI(param.Parameterized):
                 atlas_name=atlas_name,
                 step_um=25.0,
             )
+        except anatomy_atlas.AtlasTooLarge as exc:
+            # The chunks are on disk (downloaded by an earlier, larger deploy
+            # or another tool) but decoding them would exceed the memory cap.
+            print(f"Atlas refused: {exc}")
+            self.compute_anatomy_button.name = "Compute anatomical overlay 🧠"
+            self.compute_anatomy_button.disabled = False
+            _notify("error", f"{exc}. Pick a coarser resolution of this atlas.")
+            return
         except Exception as exc:
             print(f"Anatomy lookup failed: {exc}")
             self.compute_anatomy_button.name = "Compute anatomical overlay 🧠"
