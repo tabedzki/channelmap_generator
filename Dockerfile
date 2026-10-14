@@ -10,6 +10,11 @@ WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 ENV UV_CACHE_DIR=/root/.cache/uv
+# Pin the interpreter. Unpinned, uv downloads the newest CPython, so the image
+# silently changes Python whenever one is released -- and a release can break
+# the build outright (CPython 3.15: dracopy 2.0.0 ships no cp315 wheel and no
+# sdist, so `uv sync` fails). Bump deliberately once dependencies support it.
+ENV UV_PYTHON=3.14
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
