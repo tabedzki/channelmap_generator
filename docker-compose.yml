@@ -18,6 +18,11 @@ services:
       - ANALYTICS_COOKIE_MAX_AGE_DAYS=365
       - ANALYTICS_COOKIE_SAMESITE=Lax
       - ANALYTICS_COOKIE_SECURE=false
+      # Log a "[watchdog]" WARNING (with the blocked stack) when the event
+      # loop is stuck this long, and once when RSS crosses this many MB. See
+      # pixelmap/gui/watchdog.py. Set PIXELMAP_STALL_WARN_S=0 to disable.
+      - PIXELMAP_STALL_WARN_S=5
+      - PIXELMAP_RSS_WARN_MB=3000
     volumes:
       - ./output:/app/output
       - brainglobe_cache:/root/.brainglobe

@@ -8,6 +8,7 @@ from pathlib import Path
 import panel as pn
 import psutil
 
+from pixelmap.gui import watchdog
 from pixelmap.gui.gui import create_app
 
 pn.extension(notifications=True)
@@ -85,5 +86,8 @@ def main(show=True, local=True):
             verbose=True,
         )
     else:
+        # Once per process (app.py re-runs per session); we're on the server's
+        # event loop here, which is the loop the stall watchdog must watch.
+        watchdog.install()
         _log_session_start()
         create_app().servable(title="Neuropixels Channelmap Generator")
