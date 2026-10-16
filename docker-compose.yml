@@ -18,6 +18,9 @@ services:
       - ANALYTICS_COOKIE_MAX_AGE_DAYS=365
       - ANALYTICS_COOKIE_SAMESITE=Lax
       - ANALYTICS_COOKIE_SECURE=false
+      # Optional: POST unhandled errors to a webhook (see docs/getting-started.md).
+      - PIXELMAP_ERROR_WEBHOOK_URL=${PIXELMAP_ERROR_WEBHOOK_URL:-}
+      - PIXELMAP_ERROR_WEBHOOK_TOKEN=${PIXELMAP_ERROR_WEBHOOK_TOKEN:-}
     volumes:
       - ./output:/app/output
       - brainglobe_cache:/root/.brainglobe
