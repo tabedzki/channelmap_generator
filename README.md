@@ -2,6 +2,7 @@
 
 # PixelMap: a browser-based GUI to generate Neuropixels channelmaps
 
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.11008/status.svg)](https://doi.org/10.21105/joss.11008)
 [![Tests](https://github.com/m-beau/pixelmap/actions/workflows/tests.yml/badge.svg)](https://github.com/m-beau/pixelmap/actions/workflows/tests.yml)
 [![Documentation](https://readthedocs.org/projects/pixelmap-neuropixels/badge/?version=latest)](https://pixelmap-neuropixels.readthedocs.io/en/latest/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
@@ -86,7 +87,9 @@ Bug reports and feature requests are welcome via [GitHub Issues](https://github.
 
 ## Citation
 
-A paper describing PixelMap is being prepared for submission to the Journal of Open Source Software (JOSS). A DOI and citation will be provided here once published.
+If you use PixelMap in your research, please cite our paper in the Journal of Open Source Software (JOSS):
+
+> Beau, M., Fabre, J. M. J., Tabedzki, C., Yanar, J., & Brody, C. D. (2026). PixelMap: A Browser-Based Tool for Wiring-Aware, Anatomy- and Activity-Guided Design of Neuropixels Channelmaps. *Journal of Open Source Software*. [https://doi.org/10.21105/joss.11008](https://doi.org/10.21105/joss.11008)
 
 ## License
 
