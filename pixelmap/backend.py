@@ -133,7 +133,6 @@ def make_wiring_maps(wiring_maps_dir):
 def _load_wiring_maps(wiring_maps_dir):
     "Loads (or builds) the pickled electrode wiring conflict maps for each probe type. Process-wide cache, keyed on the resolved directory path; use ._load_wiring_maps.cache_clear() in tests that mutate a directory's wiring files."
     wiring_maps_dir = Path(wiring_maps_dir)
-    assert wiring_maps_dir.exists(), f"{wiring_maps_dir} does not exist!"
     cache_file = wiring_maps_dir / "wiring_maps.pkl"
 
     # If pickled result found and covers all current probe types, preload it

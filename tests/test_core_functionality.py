@@ -301,3 +301,7 @@ class TestWiringMapsSharing:
 
         assert first is not second
         assert set(first.keys()) == set(second.keys())
+
+    def test_make_wiring_maps_rejects_missing_directory(self, tmp_path):
+        with pytest.raises(AssertionError, match="does not exist"):
+            make_wiring_maps(tmp_path / "missing")
