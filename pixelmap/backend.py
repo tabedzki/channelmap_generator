@@ -5,6 +5,7 @@
 from functools import cache
 from pathlib import Path
 import pickle
+from types import MappingProxyType
 
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
@@ -141,7 +142,7 @@ def _load_wiring_maps(wiring_maps_dir):
         with open(cache_file, 'rb') as f:
             wiring_maps = pickle.load(f)
         if set(wiring_maps.keys()) == expected_keys:
-            return wiring_maps
+            return _freeze_wiring_maps(wiring_maps)
         # Cache is stale (probe types changed) — rebuild below
     
     # Generate wiring maps
@@ -165,7 +166,17 @@ def _load_wiring_maps(wiring_maps_dir):
     with open(cache_file, 'wb') as f:
         pickle.dump(wiring_maps, f)
     
-    return wiring_maps
+    return _freeze_wiring_maps(wiring_maps)
+
+
+def _freeze_wiring_maps(wiring_maps):
+    "Read-only view of the wiring maps, so the copy shared by every session can't be mutated."
+    return MappingProxyType({
+        probe_type: MappingProxyType({
+            electrode: frozenset(conflicting) for electrode, conflicting in conflicts.items()
+        })
+        for probe_type, conflicts in wiring_maps.items()
+    })
 
 
 def format_wiring_df(wiring_df):

@@ -11,6 +11,7 @@ These tests demonstrate that the software's core functionality works correctly:
 import pytest
 import numpy as np
 from pathlib import Path
+import shutil
 
 from pixelmap.backend import (
     get_electrodes,
@@ -19,6 +20,7 @@ from pixelmap.backend import (
     make_wiring_maps,
     _load_wiring_maps,
 )
+from pixelmap.gui.gui import Electrodes
 from pixelmap.utils.imro import (
     save_to_imro_file,
     read_imro_file,
@@ -312,3 +314,63 @@ class TestWiringMapsSharing:
     def test_make_wiring_maps_rejects_missing_directory(self, tmp_path):
         with pytest.raises(AssertionError, match="does not exist"):
             make_wiring_maps(tmp_path / "missing")
+
+    def test_make_wiring_maps_is_read_only(self, wiring_maps_dir):
+        """The map is shared by every session, so mutating it must fail loudly."""
+        wiring_maps = make_wiring_maps(wiring_maps_dir)
+        conflicts = wiring_maps["1.0"]
+        electrode, conflicting = next((e, c) for e, c in conflicts.items() if c)
+
+        with pytest.raises(TypeError):
+            wiring_maps["1.0"] = {}
+        with pytest.raises(TypeError):
+            conflicts[electrode] = set()
+        with pytest.raises(TypeError):
+            del conflicts[electrode]
+        with pytest.raises(AttributeError):
+            conflicting.add(electrode)
+        with pytest.raises(AttributeError):
+            conflicting.clear()
+
+    def test_electrodes_selection_leaves_shared_map_untouched(self, wiring_maps_dir):
+        wiring_map = make_wiring_maps(wiring_maps_dir)["1.0"]
+        electrode, conflicting = next((e, c) for e, c in wiring_map.items() if c)
+        snapshot = {e: set(c) for e, c in wiring_map.items()}
+
+        first = Electrodes(wiring_map, n_maximum_electrodes=384)
+        second = Electrodes(wiring_map, n_maximum_electrodes=384)
+        first.push_undo_snapshot()
+        first.select(electrode)
+
+        assert electrode in first.selected
+        assert conflicting <= first.unavailable
+        assert isinstance(first.available, set) and isinstance(first.unavailable, set)
+        assert second.selected == set() and second.unavailable == set()
+
+        first.undo()
+        assert first.selected == set() and first.unavailable == set()
+        first.redo()
+        first.deselect(electrode)
+        assert first.selected == set() and first.unavailable == set()
+        assert {e: set(c) for e, c in wiring_map.items()} == snapshot
+
+    @pytest.mark.filterwarnings("ignore::FutureWarning")
+    def test_rebuilt_wiring_maps_are_pickled_and_reloaded(self, wiring_maps_dir, tmp_path, monkeypatch):
+        """A rebuild must still write a loadable pickle, and both paths return the read-only map."""
+        # Rebuilding every probe type takes minutes; one probe exercises the same code.
+        file_map = {"1.0": WIRING_FILE_MAP["1.0"]}
+        monkeypatch.setattr("pixelmap.backend.WIRING_FILE_MAP", file_map)
+        for filename in file_map["1.0"]:
+            shutil.copy(wiring_maps_dir / filename, tmp_path / filename)
+
+        built = make_wiring_maps(tmp_path)
+        assert (tmp_path / "wiring_maps.pkl").exists()
+        _load_wiring_maps.cache_clear()
+        loaded = make_wiring_maps(tmp_path)
+
+        assert built is not loaded
+        for wiring_maps in (built, loaded):
+            assert set(wiring_maps) == {"1.0"}
+            with pytest.raises(TypeError):
+                wiring_maps["1.0"] = {}
+        assert dict(built["1.0"]) == dict(loaded["1.0"])
