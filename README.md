@@ -23,9 +23,6 @@
 - Common **presets** available out of the box (reach out to suggest other common geometries!).
 - Option to **load a pre-existing `.imro` file** as a starting point (or simply to visualize a probe geometry).
 
-> [!NOTE]
-> This tool is in **beta**. The IMRO editor tools in SpikeGLX and Open Ephys work correctly — what we provide here are tools to specify IMRO tables more easily. If you import one of our tables into SpikeGLX or Open Ephys, please double-check that all site selections, referencing, gains, and filter settings are what you intended.
-
 ![GUI screenshot](pixelmap/gui/assets/GUI_screenshot.png)
 
 ## Installation
