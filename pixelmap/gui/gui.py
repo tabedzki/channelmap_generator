@@ -3166,6 +3166,37 @@ def _extract_cfg_from_session_args() -> str | None:
     return value or None
 
 
+def _release_dead_session_views(session_context):
+    """Drop every ``pn.state._views`` entry still pointing at a dead session.
+
+    Works around a Panel bug (1.7.5 through at least 1.9.4) that leaked every
+    closed session in production.  Panel registers the per-session
+    ``NotificationArea`` in ``state._views``, a plain dict holding
+    ``(view, root, doc, comm)``, and only removes it from the notification
+    area's ``_server_destroy`` -- which Panel reaches through
+    ``state._notifications[doc]``.  But Panel's ``Document.destroy`` override
+    deletes ``state._notifications[doc]`` first, and Bokeh destroys the
+    document *before* running session-destroyed callbacks, so that hook never
+    fires.  The orphaned entry pins the dead Document and, through its models'
+    callbacks, this session's whole ``ChannelmapGUI`` (~90k ``Electrode``
+    objects of wiring maps).  RSS climbed to ~3.4 GB and the container was
+    OOM-killed.
+
+    Order-independent with Panel's own hooks: they skip refs already gone.
+    """
+    doc = getattr(session_context, "_document", None)
+    if doc is None:
+        return
+    for ref, (view, root, view_doc, _comm) in list(pn.state._views.items()):
+        if view_doc is not doc:
+            continue
+        try:
+            view._cleanup(root)
+        except Exception as exc:  # noqa: BLE001 - a failed cleanup must not keep the session pinned
+            print(f"View cleanup failed for {type(view).__name__}: {exc}")
+        pn.state._views.pop(ref, None)
+
+
 def create_app():
     """Create and configure the Panel app"""
     # Re-arm the extensions for *this* session. Panel keys `config` on the
@@ -3194,6 +3225,7 @@ def create_app():
 
     if pn.state.curdoc:
         pn.state.curdoc.on_session_destroyed(analytics_tracker.handle_session_destroyed)
+        pn.state.curdoc.on_session_destroyed(_release_dead_session_views)
 
     app_layout = pn.Column(analytics_tracker.cookie_bridge, layout, margin=0)
     app_layout._analytics_tracker = analytics_tracker
