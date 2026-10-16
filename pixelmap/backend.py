@@ -2,7 +2,7 @@
 ## Imports ##
 #############
 
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 import pickle
 
@@ -111,7 +111,7 @@ def make_wiring_maps(wiring_maps_dir):
 
     Returns a single object SHARED across every caller (and every Panel
     session) for a given wiring_maps_dir - it is memoized in-process via
-    functools.lru_cache, keyed on the resolved directory path (so a Path
+    functools.cache, keyed on the resolved directory path (so a Path
     and an equivalent str both hit the same cache entry). The unpickled
     dict is ~24.2 MB and identical for every session; before this caching
     was added, each session re-unpickled its own private copy (measured:
@@ -129,7 +129,7 @@ def make_wiring_maps(wiring_maps_dir):
     return _load_wiring_maps(str(wiring_maps_dir))
 
 
-@lru_cache(maxsize=None)
+@cache
 def _load_wiring_maps(wiring_maps_dir):
     "Loads (or builds) the pickled electrode wiring conflict maps for each probe type. Process-wide cache, keyed on the resolved directory path; use ._load_wiring_maps.cache_clear() in tests that mutate a directory's wiring files."
     wiring_maps_dir = Path(wiring_maps_dir)
