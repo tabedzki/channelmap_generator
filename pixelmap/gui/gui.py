@@ -774,10 +774,14 @@ class ChannelmapGUI(param.Parameterized):
         self.update_electrode_counter()
         self.refresh_undo_buttons()
 
-        # Clear the selection to allow for new interactions
+        # Clear the selection to allow for new interactions.
+        #
+        # No gc.collect() here: a full collection walks every live object in
+        # the process, and on the production server (GBs of RSS, hundreds of
+        # thousands of Bokeh models across sessions) that froze the single
+        # event loop for 20-90 s per click -- failing healthchecks and getting
+        # users' websockets dropped by the proxy.
         self.electrode_source.selected.indices = []
-
-        gc.collect()
 
 
     def get_zigzag_subset(self):
