@@ -278,6 +278,13 @@ class TestWiringMapsSharing:
     """make_wiring_maps must return one shared, process-wide object per
     directory instead of unpickling a fresh copy on every call."""
 
+    @pytest.fixture(autouse=True)
+    def _isolated_cache(self):
+        """Start and end each test with an empty cache so no test sees another's map."""
+        _load_wiring_maps.cache_clear()
+        yield
+        _load_wiring_maps.cache_clear()
+
     def test_make_wiring_maps_returns_same_object_for_path_and_str(self, wiring_maps_dir):
         by_path = make_wiring_maps(wiring_maps_dir)
         by_str = make_wiring_maps(str(wiring_maps_dir))
