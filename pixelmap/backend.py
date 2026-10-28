@@ -2,6 +2,7 @@
 ## Imports ##
 #############
 
+from io import BytesIO
 from pathlib import Path
 import pickle
 
@@ -10,6 +11,7 @@ import matplotlib.colors as mcolors
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 from matplotlib.collections import PatchCollection
+from matplotlib.figure import Figure
 import numpy as np
 import pandas as pd
 
@@ -670,6 +672,59 @@ def plot_probe_layout(
 
     figsize: (width, height) per shank in inch
 
+    The figure is created through pyplot, so it displays inline in notebooks
+    and with ``plt.show()`` (``plt.gcf()`` to get it).  Returns ``None`` on
+    purpose: returning the figure from a notebook cell would draw it twice.
+    For use off the main thread (e.g. the server), use
+    :func:`draw_probe_layout` / :func:`probe_layout_pdf`, which never touch
+    pyplot's global state.
+    """
+    fig = plt.figure()
+    draw_probe_layout(
+        fig, probe_type, imro_list, positions_file, wiring_file, title, figsize=figsize,
+        anatomy_bands=anatomy_bands, survey_colors=survey_colors, survey_range=survey_range,
+    )
+
+    if save_plot:
+        if saveDir is None:
+            saveDir = Path.cwd()
+        pdf_filename = "_".join(title.replace("_", " ").replace("\n", " ").split(" ")) + ".pdf"
+        fig.savefig(Path(saveDir) / pdf_filename, dpi=300, bbox_inches="tight")
+        print(f"Saved plot: {pdf_filename}")
+
+
+def probe_layout_pdf(
+    probe_type, imro_list, positions_file, wiring_file, title, figsize=(2, 30),
+    anatomy_bands=None, survey_colors=None, survey_range=None
+) -> BytesIO:
+    """Render the probe layout to an in-memory PDF, without pyplot.
+
+    Uses a standalone :class:`~matplotlib.figure.Figure`, so it is safe to call
+    from worker threads: nothing is registered in pyplot's global figure list,
+    and matplotlib keys its font cache per thread.  Same output as saving
+    :func:`plot_probe_layout`'s figure at 300 dpi with a tight bounding box.
+    """
+    fig = Figure()
+    draw_probe_layout(
+        fig, probe_type, imro_list, positions_file, wiring_file, title, figsize=figsize,
+        anatomy_bands=anatomy_bands, survey_colors=survey_colors, survey_range=survey_range,
+    )
+    buffer = BytesIO()
+    fig.savefig(buffer, format="pdf", dpi=300, bbox_inches="tight")
+    buffer.seek(0)
+    return buffer
+
+
+def draw_probe_layout(
+    fig, probe_type, imro_list, positions_file, wiring_file, title, figsize=(2, 30),
+    anatomy_bands=None, survey_colors=None, survey_range=None
+):
+    """Draw the probe layout into ``fig``, an empty figure; returns ``fig``.
+
+    Resizes ``fig`` to fit the probe (``figsize`` is per shank, in inches).
+    Only touches ``fig`` itself -- never pyplot -- so callers choose whether
+    the figure is pyplot-managed (:func:`plot_probe_layout`) or standalone
+    (:func:`probe_layout_pdf`).
     """
 
     # Format parameters
@@ -696,7 +751,8 @@ def plot_probe_layout(
 
     # Single shank
     if n_shanks == 1:
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
+        fig.set_size_inches(figsize)
+        ax = fig.subplots()
 
         # Scale factor to make electrodes visible
         tick_width = 1
@@ -870,7 +926,8 @@ def plot_probe_layout(
 
     # multi-shank
     else:
-        fig, ax = plt.subplots(1, 1, figsize=(figsize[0] * n_shanks * 0.8, figsize[1]))
+        fig.set_size_inches(figsize[0] * n_shanks * 0.8, figsize[1])
+        ax = fig.subplots()
 
         shank_width = 80
         shank_spacing = 150
@@ -1099,7 +1156,7 @@ def plot_probe_layout(
     legend_loc = "upper right" if n_shanks == 1 else "upper left"
     ax.legend(title="Electrode state:", handles=legend_elements, bbox_to_anchor=(0.9, 0), loc=legend_loc)
 
-    plt.tight_layout()
+    fig.tight_layout()
 
     # Survey colorbar: matched to the legend box style, placed directly above it.
     # Must come after tight_layout so legend bounding boxes are finalised.
@@ -1109,11 +1166,11 @@ def plot_probe_layout(
         sm = cm.ScalarMappable(norm=norm, cmap="viridis")
         sm.set_array([])
 
-        # Render canvas so bounding boxes are available.
-        fig.canvas.draw()
-        renderer = fig.canvas.get_renderer()
+        # Lay out the figure so bounding boxes are available.  Works on any
+        # canvas, including a standalone Figure's base canvas.
+        fig.draw_without_rendering()
         leg = ax.get_legend()
-        leg_bb = leg.get_window_extent(renderer)
+        leg_bb = leg.get_window_extent()
         # Convert display coords → figure fraction.
         leg_frac = leg_bb.transformed(fig.transFigure.inverted())
 
@@ -1127,7 +1184,7 @@ def plot_probe_layout(
         cb_bottom = leg_frac.y1 + 0.25 / fig_h
 
         cax = fig.add_axes([cb_left, cb_bottom, cb_w, cb_h])
-        cbar = plt.colorbar(sm, cax=cax, orientation="horizontal")
+        cbar = fig.colorbar(sm, cax=cax, orientation="horizontal")
 
         # Mirror legend aesthetics: title on top, ticks below, boxed border.
         cbar.ax.set_title("Survey value", fontsize=9, pad=4)
@@ -1139,9 +1196,4 @@ def plot_probe_layout(
             spine.set_linewidth(0.8)
             spine.set_color("#aaaaaa")
 
-    if save_plot:
-        if saveDir is None:
-            saveDir = Path.cwd()
-        pdf_filename = "_".join(title.replace("\n", " ").split(" ")) + ".pdf"
-        plt.savefig(Path(saveDir) / pdf_filename, dpi=300, bbox_inches="tight")
-        print(f"Saved plot: {pdf_filename}")
+    return fig
