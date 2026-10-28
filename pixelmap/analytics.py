@@ -6,7 +6,7 @@ import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import panel as pn
 import param
@@ -48,7 +48,7 @@ class VisitorCookieBridge(ReactiveHTML):
 
     _template = '<div id="visitor-cookie-bridge" style="display: none;"></div>'
 
-    _scripts = {
+    _scripts: ClassVar[dict[str, str]] = {
         "render": """
         const cookiePrefix = `${data.cookie_name}=`;
         const existingCookie = document.cookie
@@ -114,10 +114,9 @@ def _connect(db_path: Path) -> sqlite3.Connection:
 
 def initialize_database(db_path: Path | None = None) -> Path:
     target_path = db_path or resolve_analytics_db_path()
-    with _DB_INIT_LOCK:
-        with _connect(target_path) as connection:
-            connection.executescript(
-                """
+    with _DB_INIT_LOCK, _connect(target_path) as connection:
+        connection.executescript(
+            """
                 CREATE TABLE IF NOT EXISTS visits (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     anonymous_visitor_id TEXT,
@@ -138,7 +137,7 @@ def initialize_database(db_path: Path | None = None) -> Path:
                     visit_count INTEGER NOT NULL DEFAULT 0
                 );
                 """
-            )
+        )
     return target_path
 
 

@@ -148,7 +148,7 @@ def _malloc_trim() -> None:
         return
     try:
         trim(0)
-    except Exception:  # noqa: BLE001 - best-effort reclaim, never fatal
+    except Exception:  # noqa: BLE001, S110 - best-effort reclaim, never fatal
         pass
 
 
@@ -350,7 +350,7 @@ def _registry_from_disk() -> list[str] | None:
         if cache_path.exists():
             data = utils.conf_from_file(cache_path)
             return sorted(data["atlases"].keys())
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 - unreadable registry cache: fall back to None
         pass
     return None
 
@@ -385,7 +385,7 @@ def _refresh_registry_in_background() -> None:
             get_all_atlases_lastversions()
             if _registry_from_disk():
                 list_atlases.cache_clear()
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 - background refresh; stale registry is fine
             pass
         finally:
             with _registry_refresh_lock:
@@ -421,7 +421,7 @@ def is_downloaded(name: str = _DEFAULT_ATLAS) -> bool:
         return False
     try:
         return _annotation_is_cached(get_atlas(name))
-    except Exception:
+    except Exception:  # noqa: BLE001 - unreadable atlas means not downloaded
         # Metadata unreadable, or the manifest is there but incomplete: treat
         # it as not-downloaded so callers take the "this will cost you" path.
         return False
