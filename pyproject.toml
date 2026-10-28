@@ -81,8 +81,16 @@ dev = [
     "furo>=2025.12.19",
     "myst-parser>=4.0.1",
     "pytest>=8.4.1",
+    "pytest-cov>=6.0.0",
     "sphinx-autobuild>=2024.10.3",
     "sphinx-design>=0.6.1",
+    {include-group = "lint"},
+]
+# Pinned exactly: ruff's default rule set grows between releases (56 rules in
+# 0.12, 406 in 0.17), so an unpinned ruff fails CI on code nobody touched.
+# Bump deliberately, fixing what the new version flags in the same PR.
+lint = [
+    "ruff==0.17.3",
 ]
 
 [tool.ruff]
@@ -91,6 +99,9 @@ line-length = 100
 exclude = [".venv", "output", "docs/_build", "pixelmap.egg-info"]
 
 [tool.ruff.lint]
+# ruff's own defaults, plus the classic pyflakes/pycodestyle set, so those
+# stay on even if a future default set drops them.
+extend-select = ["E4", "E7", "E9", "F"]
 ignore = [
     "E722",  # bare except
     "F403",  # 'from module import *' used
