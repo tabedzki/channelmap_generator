@@ -65,7 +65,17 @@ A frozen oracle from dev commit `5048eb991b2676c02c98df00428bbdc5f1a7dd0e`:
 All supported part numbers and all reference modes for each supported IMRO
 format are represented. Each case chooses one nonempty wiring CSV cell per
 readout channel and shuffles the selection before generation. This exercises
-all banks, multiple shanks, channel sorting, gains, and both filter settings.
+multiple banks and shanks, channel sorting, gains, and both filter settings.
+
+Known baseline limitation: dev's `REF_BANKS["2.0-1shank"][0]` is `0`, although
+[SpikeGLX defines bank A as `1 << 0`](https://github.com/billkarsh/SpikeGLX/blob/master/IMEC/NeuropixAPI.h).
+For the single-shank NP2 cases only, random bank 0 choices use the same readout
+channel's bank 1 site instead. These 25 IMROs therefore use banks 1–3, with an
+independent assertion that each exported bank mask equals `1 << bank`. The
+other three groups still cover bank 0. Fixing production bank 0 encoding is
+outside this reference-test change. The corpus was recaptured on local dev
+commit `68b7c03d78f029c12ab67ca3615f1d219fc14243`, whose production code is
+identical to the original upstream baseline.
 
 The manifest freezes input selections and parameters; `.imro` files freeze the
 original dev output. Tests validate hardware constraints directly against raw

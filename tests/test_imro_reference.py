@@ -109,6 +109,9 @@ def test_random_imro_matches_dev_reference(case, reference_wiring, tmp_path):
         **params, custom_electrodes=np.array(electrodes), wiring_file=str(path)
     )
     assert actual == expected
+    if case["probe_type"] == "2.0-1shank":
+        # The bank mask must select exactly the bank containing the electrode.
+        assert all(entry[1] == 1 << (entry[3] // 384) for entry in actual[1:])
     assert actual[0] == (case["probe_subtype"], features["n_readouts_total"])
     assert [entry[0] for entry in actual[1:]] == list(range(features["n_readouts_total"]))
     destination = tmp_path / "roundtrip.imro"
