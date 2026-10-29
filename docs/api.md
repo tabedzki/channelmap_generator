@@ -46,10 +46,10 @@ PixelMap can be used programmatically from Python scripts or Jupyter notebooks.
 The following constants are defined in `pixelmap.constants`:
 
 `PROBE_TYPE_MAP`
-: Mapping from probe type names (`"1.0"`, `"2.0-1shank"`, `"2.0-4shanks"`) to lists of SpikeGLX probe types.
+: Mapping from probe type names (e.g. `"1.0"`, `"2.0-1shank"`, `"2.0-4shanks"`, `"QuadBase"`) to lists of SpikeGLX part numbers (e.g. `"NP1000"`).
 
-`PROBE_N`
-: Number of physical electrodes (`N`), ADC channels (`n`), and channels per shank (`n_per_shank`) for each probe type.
+`PROBE_FEATURES`
+: Per-part-number probe features: shank count, sites and readout channels (total and per shank), electrode pitch, and IMRO format.
 
 `SUPPORTED_1shank_PRESETS`
 : Available preset names for single-shank probes. See the [preset reference](presets.md).
@@ -62,12 +62,16 @@ The following constants are defined in `pixelmap.constants`:
 ### Generate a channelmap from a preset
 
 ```python
+from pathlib import Path
+
 import pixelmap as cmg
+
+WIRING_DIR = Path(cmg.__file__).parent / "wiring_maps"
 
 imro_list = cmg.generate_imro_channelmap(
     probe_type="2.0-4shanks",
     layout_preset="tips_all",
-    wiring_file="wiring_maps/2.0-4shanks_wiring.csv"
+    wiring_file=WIRING_DIR / "2.0-4shanks_wiring.csv"
 )
 
 cmg.save_to_imro_file(imro_list, "my_channelmap.imro")
@@ -76,8 +80,12 @@ cmg.save_to_imro_file(imro_list, "my_channelmap.imro")
 ### Generate a channelmap with custom electrodes
 
 ```python
+from pathlib import Path
+
 import numpy as np
 import pixelmap as cmg
+
+WIRING_DIR = Path(cmg.__file__).parent / "wiring_maps"
 
 # Custom electrode selection: array of (shank_id, electrode_id) pairs
 custom = np.array([[0, i] for i in range(384)])
@@ -85,7 +93,7 @@ custom = np.array([[0, i] for i in range(384)])
 imro_list = cmg.generate_imro_channelmap(
     probe_type="1.0",
     custom_electrodes=custom,
-    wiring_file="wiring_maps/1.0_wiring.csv"
+    wiring_file=WIRING_DIR / "1.0_wiring.csv"
 )
 
 cmg.save_to_imro_file(imro_list, "custom_channelmap.imro")

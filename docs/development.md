@@ -106,12 +106,15 @@ ruff format .
 
 To add support for a new probe (e.g., Quadbase, NXT):
 
-1. **Add wiring map**: Create `wiring_maps/<probe_type>_wiring.csv` defining electrode-to-ADC mappings
+1. **Add wiring map**: Create `pixelmap/wiring_maps/<probe_type>_wiring.csv` defining electrode-to-ADC mappings
 
 2. **Update constants**: In `constants.py`, add entries to:
-   - `PROBE_TYPE_MAP` - SpikeGLX probe types
-   - `PROBE_N` - Electrode and channel counts
+   - `WIRING_FILE_MAP` - Positions and wiring CSVs for the probe type
    - `SUPPORTED_*_PRESETS` - Available presets (if applicable)
+
+   Part numbers, electrode counts and readout counts are not set by hand:
+   `utils/probe_features.py` builds `PROBE_FEATURES` and `PROBE_TYPE_MAP` from
+   `pixelmap/wiring_maps/Neuropixels_probe_features_Bill_Karsh.json`.
 
 3. **Update GUI**: In `gui/gui.py`, add the probe to the dropdown options
 
