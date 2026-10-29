@@ -57,6 +57,28 @@ from the raw wiring CSV and the [SpikeGLX mask rule](https://billkarsh.github.io
 (`1 << bank`). Tests require exact tuples and saved bytes, correct masks for
 all four banks, sorted channels, and file round trips.
 
+### `test_imro_reference.py`
+
+A frozen oracle from dev commit `5048eb991b2676c02c98df00428bbdc5f1a7dd0e`:
+100 reproducibly random, valid full-readout IMRO files, with 25 cases each for
+`1.0`, `2.0-1shank`, `2.0-4shanks`, and `QuadBase`. The seed is `20261029`.
+All supported part numbers and all reference modes for each supported IMRO
+format are represented. Each case chooses one nonempty wiring CSV cell per
+readout channel and shuffles the selection before generation. This exercises
+all banks, multiple shanks, channel sorting, gains, and both filter settings.
+
+The manifest freezes input selections and parameters; `.imro` files freeze the
+original dev output. Tests validate hardware constraints directly against raw
+CSV cells, compare coordinate lookup and forbidden electrodes, require exact
+IMRO tuple and byte equality, and check save/read/parse round trips with modern
+and legacy headers. Expected outputs are never regenerated during tests.
+
+Run with `python -m pytest tests/test_imro_reference.py -q`. To deliberately
+create a new corpus, use an unmodified baseline checkout and run
+`PYTHONPATH=. python tests/generate_imro_reference.py OUTPUT_DIR` with a new,
+nonexistent output directory. Review any baseline change before replacing the
+committed corpus; never regenerate expected outputs on a performance branch.
+
 ### Activity survey overlay ⚡
 
 #### `test_survey.py` (17 tests)
