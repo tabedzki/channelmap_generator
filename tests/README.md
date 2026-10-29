@@ -46,6 +46,17 @@ Complete workflow tests simulating real usage:
 - Custom electrode selection workflow
 - Multiple presets for the same probe
 
+### `test_imro_bank_masks.py`
+
+Regression coverage for [issue #77](https://github.com/m-beau/pixelmap/issues/77):
+NP2 single-shank bank 0 must export mask `1`, not `0`. Eight cases cover bank-0
+and mixed-bank full-readout selections with modern and legacy headers for
+both single-shank NP2 formats (`NP2000`/`21` and `NP2003`/`2003`). Frozen
+`np2_bank0.imro` and `np2_mixed_banks.imro` fixtures were built independently
+from the raw wiring CSV and the [SpikeGLX mask rule](https://billkarsh.github.io/SpikeGLX/help/imroTables/)
+(`1 << bank`). Tests require exact tuples and saved bytes, correct masks for
+all four banks, sorted channels, and file round trips.
+
 ### Activity survey overlay ⚡
 
 #### `test_survey.py` (17 tests)
