@@ -66,6 +66,23 @@ def test_reference_corpus_coverage():
     assert {p.stem for p in REFERENCE_DIR.glob("*.imro")} == {c["id"] for c in cases}
 
 
+@pytest.mark.parametrize("group", tuple(WIRING_FILE_MAP))
+def test_reference_corpus_covers_every_bank(group):
+    """Every group's corpus must use every bank of its probe, bank 0 included.
+
+    Bank 0 is where NP2 single-shank used to export mask ``0`` (issue #77), so
+    a corpus that avoids it would leave the fixed encoding untested.
+    """
+    banks = {
+        electrode // 384
+        for case in MANIFEST["cases"]
+        if case["probe_type"] == group
+        for _, electrode in case["electrodes"]
+    }
+    n_sites = PROBE_FEATURES[PROBE_TYPE_MAP[group][0]]["n_sites_per_shank"]
+    assert banks == set(range((n_sites + 383) // 384))  # 1.0: banks 0-2; NP2: 0-3
+
+
 @pytest.mark.parametrize("case", MANIFEST["cases"], ids=lambda case: case["id"])
 def test_random_imro_matches_dev_reference(case, reference_wiring, tmp_path):
     path, wiring, coordinates, channels = reference_wiring[case["probe_type"]]
@@ -109,9 +126,20 @@ def test_random_imro_matches_dev_reference(case, reference_wiring, tmp_path):
         **params, custom_electrodes=np.array(electrodes), wiring_file=str(path)
     )
     assert actual == expected
+    # Only NP2 single-shank stores a one-hot bank *mask* (``1 << bank``, so
+    # never 0). Every other format stores the bank *index*, where 0 is valid;
+    # the #77 fix must not leak into them.
     if case["probe_type"] == "2.0-1shank":
-        # The bank mask must select exactly the bank containing the electrode.
         assert all(entry[1] == 1 << (entry[3] // 384) for entry in actual[1:])
+    elif case["probe_type"] == "1.0":
+        assert all(
+            entry[1] == electrode // 384
+            for entry, (_, electrode) in zip(
+                actual[1:], sorted(electrodes, key=lambda e: e[1] % 384)
+            )
+        )
+    else:
+        assert all(entry[2] == entry[4] // 384 for entry in actual[1:])
     assert actual[0] == (case["probe_subtype"], features["n_readouts_total"])
     assert [entry[0] for entry in actual[1:]] == list(range(features["n_readouts_total"]))
     destination = tmp_path / "roundtrip.imro"
@@ -134,6 +162,45 @@ def test_random_imro_matches_dev_reference(case, reference_wiring, tmp_path):
         assert (ap, lf, hp) == (case["ap_gain"], case["lf_gain"], case["hp_filter"])
     else:
         assert (ap, lf, hp) == (None, None, None)
+
+
+NP2_SINGLE_SHANK_CASES = [c for c in MANIFEST["cases"] if c["probe_type"] == "2.0-1shank"]
+
+
+@pytest.mark.parametrize("case", NP2_SINGLE_SHANK_CASES, ids=lambda case: case["id"])
+def test_pre_fix_np2_bank0_export_still_loads(case, reference_wiring, tmp_path):
+    """Files exported before the #77 fix keep loading, and re-export corrects them.
+
+    Before #78, NP2 single-shank exports used mask ``0`` for bank-0 sites.
+    That output changes
+    with the fix, so the old files must still parse to the same selection
+    (the parser reads the electrode column, not the mask), and regenerating
+    from them must produce today's bytes with mask ``1``.
+    """
+    path = reference_wiring[case["probe_type"]][0]
+    fixed_bytes = (REFERENCE_DIR / f"{case['id']}.imro").read_bytes()
+    fixed = parse_imro_file(fixed_bytes.decode().strip())
+    pre_fix = [
+        fixed[0],
+        *((ch, 0 if mask == 1 else mask, ref, el) for ch, mask, ref, el in fixed[1:]),
+    ]
+    assert sum(entry[1] == 0 for entry in pre_fix[1:]) > 0  # the case does exercise bank 0
+
+    old_file = tmp_path / "pre_fix.imro"
+    save_to_imro_file(pre_fix, str(old_file))
+    assert old_file.read_bytes() != fixed_bytes
+    electrodes, group, subtype, reference, *_ = parse_imro_list(read_imro_file(old_file))
+    assert set(map(tuple, electrodes)) == set(map(tuple, case["electrodes"]))
+
+    regenerated = generate_imro_channelmap(
+        probe_type=group,
+        probe_subtype=subtype,
+        reference_id=reference,
+        custom_electrodes=electrodes,
+        wiring_file=str(path),
+    )
+    assert regenerated == fixed
+    assert 0 not in {entry[1] for entry in regenerated[1:]}
 
 
 INVALID_SELECTIONS = (

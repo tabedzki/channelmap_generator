@@ -59,7 +59,8 @@ all four banks, sorted channels, and file round trips.
 
 ### `test_imro_reference.py`
 
-A frozen oracle from dev commit `5048eb991b2676c02c98df00428bbdc5f1a7dd0e`:
+A frozen oracle from dev commit `b73bd4da38f910465d4b43b52028d2b58a58c30b`
+(after the NP2 bank-mask fix in #78):
 100 reproducibly random, valid full-readout IMRO files, with 25 cases each for
 `1.0`, `2.0-1shank`, `2.0-4shanks`, and `QuadBase`. The seed is `20261029`.
 All supported part numbers and all reference modes for each supported IMRO
@@ -67,18 +68,19 @@ format are represented. Each case chooses one nonempty wiring CSV cell per
 readout channel and shuffles the selection before generation. This exercises
 multiple banks and shanks, channel sorting, gains, and both filter settings.
 
-Known baseline limitation: dev's `REF_BANKS["2.0-1shank"][0]` is `0`, although
-[SpikeGLX defines bank A as `1 << 0`](https://github.com/billkarsh/SpikeGLX/blob/master/IMEC/NeuropixAPI.h).
-For the single-shank NP2 cases only, random bank 0 choices use the same readout
-channel's bank 1 site instead. These 25 IMROs therefore use banks 1–3, with an
-independent assertion that each exported bank mask equals `1 << bank`. The
-other three groups still cover bank 0. Fixing production bank 0 encoding is
-outside this reference-test change. The corpus was recaptured on local dev
-commit `68b7c03d78f029c12ab67ca3615f1d219fc14243`, whose production code is
-identical to the original upstream baseline.
+Every group includes all of its banks. NP2 single-shank cases now include
+banks 0–3 and assert `mask == 1 << bank`, so bank 0 must export mask `1`.
+Other probe groups continue to use bank indices, where `0` is valid. The
+corpus was recaptured from merged dev after #78; the 75 non-single-shank-NP2
+IMRO files retain their original bytes.
+
+An additional 25 backward-compatibility checks simulate NP2 single-shank
+exports from before the fix (bank 0 encoded as mask `0`). They verify that
+those files still load to the same electrode selections and re-export with
+the corrected mask `1`.
 
 The manifest freezes input selections and parameters; `.imro` files freeze the
-original dev output. Tests validate hardware constraints directly against raw
+captured dev output. Tests validate hardware constraints directly against raw
 CSV cells, compare coordinate lookup and forbidden electrodes, require exact
 IMRO tuple and byte equality, and check save/read/parse round trips with modern
 and legacy headers. Expected outputs are never regenerated during tests.
@@ -91,8 +93,9 @@ message from the public generation path. Valid controls confirm conflicting
 contacts work individually and selections at the readout limit are accepted.
 They are normal passing tests when rejection works, not expected failures.
 
-Run with `python -m pytest tests/test_imro_reference.py -q` (141 checks: 100
-valid cases, 40 invalid cases, and one corpus coverage check). To deliberately
+Run with `python -m pytest tests/test_imro_reference.py -q` (170 checks: 100
+valid cases, 40 invalid cases, 25 older-export compatibility cases, four
+per-group bank coverage checks, and one corpus coverage check). To deliberately
 create a new corpus, use an unmodified baseline checkout and run
 `PYTHONPATH=. python tests/generate_imro_reference.py OUTPUT_DIR` with a new,
 nonexistent output directory. Review any baseline change before replacing the

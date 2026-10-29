@@ -49,15 +49,7 @@ def main(output):
             count = reference_counts.get(fmt, 0)
             reference = references[count % len(references)]
             reference_counts[fmt] = count + 1
-            electrodes = []
-            for candidates in choices:
-                selected = rng.choice(candidates)
-                # Dev encodes NP2 single-shank bank 0 as mask 0 (no bank).
-                # Use the same channel's bank 1 site so these frozen IMROs
-                # are valid without changing production code in a test commit.
-                if group == "2.0-1shank" and selected[1] < 384:
-                    selected = candidates[1]
-                electrodes.append(selected)
+            electrodes = [rng.choice(candidates) for candidates in choices]
             rng.shuffle(electrodes)  # Exercise sorting and input-order coordinate lookup.
             case = {
                 "id": f"{group}-{index:02d}",
