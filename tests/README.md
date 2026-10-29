@@ -83,7 +83,16 @@ CSV cells, compare coordinate lookup and forbidden electrodes, require exact
 IMRO tuple and byte equality, and check save/read/parse round trips with modern
 and legacy headers. Expected outputs are never regenerated during tests.
 
-Run with `python -m pytest tests/test_imro_reference.py -q`. To deliberately
+The same module includes 40 deliberately invalid selections: 10 per group.
+Each group has four pairs of contacts sharing an ADC channel, two selections
+exceeding its per-shank readout limit, two invalid electrode IDs, and two
+invalid shank IDs. These tests require the specific validation assertion and
+message from the public generation path. Valid controls confirm conflicting
+contacts work individually and selections at the readout limit are accepted.
+They are normal passing tests when rejection works, not expected failures.
+
+Run with `python -m pytest tests/test_imro_reference.py -q` (141 checks: 100
+valid cases, 40 invalid cases, and one corpus coverage check). To deliberately
 create a new corpus, use an unmodified baseline checkout and run
 `PYTHONPATH=. python tests/generate_imro_reference.py OUTPUT_DIR` with a new,
 nonexistent output directory. Review any baseline change before replacing the

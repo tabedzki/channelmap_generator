@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pixelmap.backend import find_electrode_coordinates, find_forbidden_electrodes
+from pixelmap.backend import find_electrode_coordinates, find_forbidden_electrodes, get_electrodes
 from pixelmap.constants import PROBE_FEATURES, PROBE_TYPE_MAP, REF_ELECTRODES, WIRING_FILE_MAP
 from pixelmap.utils.imro import (
     generate_imro_channelmap,
@@ -134,3 +134,72 @@ def test_random_imro_matches_dev_reference(case, reference_wiring, tmp_path):
         assert (ap, lf, hp) == (case["ap_gain"], case["lf_gain"], case["hp_filter"])
     else:
         assert (ap, lf, hp) == (None, None, None)
+
+
+INVALID_SELECTIONS = (
+    "conflict-row-0",
+    "conflict-row-1",
+    "conflict-row-127",
+    "conflict-row-383",
+    "over-cap-by-1",
+    "over-cap-by-2",
+    "negative-electrode",
+    "electrode-past-end",
+    "negative-shank",
+    "shank-past-end",
+)
+
+
+@pytest.mark.parametrize("group", tuple(WIRING_FILE_MAP))
+@pytest.mark.parametrize("failure", INVALID_SELECTIONS)
+def test_deliberately_invalid_imro_is_rejected(group, failure, reference_wiring):
+    """Ten invalid selections per group must raise the intended validation error.
+
+    These are ordinary passing tests: failing to reject invalid input fails the
+    test. No xfail markers or catch-all exception assertions hide regressions.
+    """
+    path, wiring, coordinates, channels = reference_wiring[group]
+    subtype = PROBE_TYPE_MAP[group][0]
+    features = PROBE_FEATURES[subtype]
+    if failure.startswith("conflict-row-"):
+        row = int(failure.removeprefix("conflict-row-"))
+        # Raw CSV cells in the same row share one ADC readout. Both contacts
+        # exist and are valid independently, but cannot be selected together.
+        selected = sorted(channels[row])[:2]
+        assert len(selected) == 2
+        assert selected[0] != selected[1]
+        for electrode in selected:
+            get_electrodes(
+                group, wiring, custom_electrodes=np.array([electrode]), probe_subtype=subtype
+            )
+        message = "Selected electrodes conflict with wiring diagram"
+    elif failure.startswith("over-cap-by-"):
+        excess = int(failure.removeprefix("over-cap-by-"))
+        cap = features["n_readouts_per_shank"]
+        selected = sorted(electrode for electrode in coordinates if electrode[0] == 0)[
+            : cap + excess
+        ]
+        assert len(set(selected)) == cap + excess
+        # The same selection truncated at the limit is accepted.
+        get_electrodes(
+            group, wiring, custom_electrodes=np.array(selected[:cap]), probe_subtype=subtype
+        )
+        message = rf"too many electrodes \({cap + excess}\) on shank 0"
+    else:
+        missing = {
+            "negative-electrode": (0, -1),
+            "electrode-past-end": (0, features["n_sites_per_shank"]),
+            "negative-shank": (-1, 0),
+            "shank-past-end": (features["num_shanks"], 0),
+        }[failure]
+        assert missing not in coordinates
+        selected = [missing]
+        message = f"electrode {missing[1]} on shank {missing[0]} not found in wiring map!"
+
+    with pytest.raises(AssertionError, match=message):
+        generate_imro_channelmap(
+            probe_type=group,
+            probe_subtype=subtype,
+            custom_electrodes=np.array(selected),
+            wiring_file=str(path),
+        )
