@@ -15,7 +15,6 @@ from .constants import (
     LEGACY_INT_TO_IMRO_FORMAT,
     LEGACY_PROBE_TYPE_MAP,
     PROBE_FEATURES,
-    PROBE_TYPE_MAP,  # noqa: F401 - unused here, but public via `from pixelmap import *`
     REF_BANKS,
     REF_ELECTRODES,
     WIRING_FILE_MAP,
