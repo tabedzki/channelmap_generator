@@ -1,14 +1,13 @@
 """Regression tests for the package's public imports and documented API."""
 
-from pathlib import Path
 import re
+from pathlib import Path
 
 import pytest
 
 import pixelmap
 from pixelmap.constants import PROBE_TYPE_MAP
 from pixelmap.types import Electrode
-
 
 PUBLIC_NAMES = {
     "get_electrodes",
@@ -67,7 +66,7 @@ def test_all_lists_exact_public_api():
 
 def test_star_import_matches_all():
     namespace = {}
-    exec("from pixelmap import *", namespace)
+    exec("from pixelmap import *", namespace)  # noqa: S102 - exercise Python star-import semantics
     namespace.pop("__builtins__")
     assert set(namespace) == set(pixelmap.__all__)
     for name, value in namespace.items():
