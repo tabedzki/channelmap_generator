@@ -15,30 +15,30 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    # ruff is a standalone binary, so the runner's own Python is enough here.
     - name: Set up uv
       uses: astral-sh/setup-uv@v10
       with:
-        python-version: '3.14'
+        cache-suffix: lint
 
-    # The `lint` group pins ruff, so CI and local runs check the same rules.
+    # uv.lock pins the ruff version, so CI and local runs check the same rules.
     - name: Lint with ruff
       run: uv run --locked --only-group lint ruff check --output-format=github .
 
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        # Keep in step with UV_PYTHON in the Dockerfile: test what ships.
-        python-version: ['3.14']
+    env:
+      # Keep in step with UV_PYTHON in the Dockerfile: test what ships.
+      UV_PYTHON: '3.14'
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up uv and Python ${{ matrix.python-version }}
+    - name: Set up uv
       uses: astral-sh/setup-uv@v10
       with:
-        python-version: ${{ matrix.python-version }}
+        cache-suffix: test
 
     # --locked installs exactly uv.lock (as the image does) and fails if the
     # lockfile is out of date with pyproject.toml.
@@ -46,12 +46,10 @@ jobs:
       run: uv sync --locked
 
     - name: Run tests with coverage
-      run: |
-        uv run --locked pytest tests/ -v --cov=pixelmap --cov-report=xml --cov-report=term
+      run: uv run --locked pytest tests/ -v --cov=pixelmap --cov-report=xml --cov-report=term
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
-      if: matrix.python-version == '3.14'
       with:
         file: ./coverage.xml
         fail_ci_if_error: false

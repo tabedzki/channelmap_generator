@@ -86,17 +86,20 @@ dev = [
     "sphinx-design>=0.6.1",
     {include-group = "lint"},
 ]
-# Pinned exactly: ruff's default rule set grows between releases (56 rules in
-# 0.12, 406 in 0.17), so an unpinned ruff fails CI on code nobody touched.
-# Bump deliberately, fixing what the new version flags in the same PR.
+# Floor only: uv.lock pins the exact ruff CI runs. ruff's default rule set
+# grows between releases (56 rules in 0.12, 406 in 0.17), so bump it
+# deliberately (`uv lock --upgrade-package ruff`) and fix what it flags in the
+# same PR.
 lint = [
-    "ruff==0.17.3",
+    "ruff>=0.17.3",
 ]
 
 [tool.ruff]
 target-version = "py311"
 line-length = 100
 exclude = [".venv", "output", "docs/_build", "pixelmap.egg-info"]
+# An older ruff checks fewer default rules and would pass what CI rejects.
+required-version = ">=0.17.3"
 
 [tool.ruff.lint]
 # ruff's own defaults, plus the classic pyflakes/pycodestyle set, so those
