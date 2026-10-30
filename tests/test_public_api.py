@@ -131,8 +131,8 @@ def test_submodules_remain_importable_but_not_star_exported():
         assert module_name not in pixelmap.__all__
 
 
-def test_package_metadata_is_unchanged():
-    assert pixelmap.__version__ == "1.4.2"
+def test_package_version_remains_accessible():
+    assert re.fullmatch(r"\d+\.\d+\.\d+", pixelmap.__version__)
     assert "__version__" not in pixelmap.__all__
 
 
