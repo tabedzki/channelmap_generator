@@ -729,6 +729,8 @@ def plot_probe_layout(
     # Define forbidden electrodes from wiring map
     wiring_df = pd.read_csv(wiring_file)
     forbidden_electrodes = find_forbidden_electrodes(selected_electrodes, wiring_df)
+    # (n, 2) even when empty: find_forbidden_electrodes returns 1-D when nothing conflicts
+    forbidden_electrodes = np.asarray(forbidden_electrodes).reshape(-1, 2)
 
     # Load positions
     positions_df = pd.read_csv(positions_file)
@@ -1004,13 +1006,12 @@ def plot_probe_layout(
 
             # Draw electrodes (and optional survey sidebar bars)
             shank_positions = positions[shank_m]
-            shank_selected = selected_electrodes[shank_m_selected]
-            is_selected = np.isin(shank_positions[:, 0], shank_selected[:, 0]) & np.isin(
-                shank_positions[:, 1], shank_selected[:, 1]
-            )
-            is_forbidden = np.isin(shank_positions[:, 0], forbidden_electrodes[:, 0]) & np.isin(
-                shank_positions[:, 1], forbidden_electrodes[:, 1]
-            )
+            # Both lists are filtered to this shank, so matching on electrode ID
+            # alone matches (shank, electrode) pairs.
+            shank_selected = selected_electrodes[shank_m_selected, 1]
+            shank_forbidden = forbidden_electrodes[forbidden_electrodes[:, 0] == shank_id, 1]
+            is_selected = np.isin(shank_positions[:, 1], shank_selected)
+            is_forbidden = np.isin(shank_positions[:, 1], shank_forbidden)
             electrode_rects, electrode_colors = [], []
             bar_rects, bar_colors = [], []
             for (shank_id_pos, electrode, orig_x, y), sel, forb in zip(shank_positions, is_selected, is_forbidden):

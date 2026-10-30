@@ -16,6 +16,8 @@ import matplotlib
 matplotlib.use("agg")
 
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import pytest
 from matplotlib.collections import PatchCollection
 
@@ -129,6 +131,62 @@ def test_selected_electrodes_coloured(gui):
     forbidden = rgba(matplotlib.colors.to_rgba("black", 1.0))
     assert set(colours) <= {selected, unselected, forbidden}
     assert colours.count(selected) == len(gui.imro_list) - 1  # minus header row
+
+
+def _rgba(c):
+    return tuple(round(float(v), 6) for v in c)
+
+
+SELECTED_RGBA = _rgba(matplotlib.colors.to_rgba("red", 1.0))
+FORBIDDEN_RGBA = _rgba(matplotlib.colors.to_rgba("black", 1.0))
+
+
+def _electrode_collections(ax):
+    """Per-shank electrode PatchCollections, in shank order (survey bars excluded)."""
+    return [c for c in ax.collections if isinstance(c, PatchCollection) and c.get_zorder() != 50]
+
+
+@pytest.mark.parametrize("probe_type", ["2.0-4shanks", "QuadBase"])
+def test_multishank_forbidden_matches_shank_electrode_pairs(gui, probe_type, monkeypatch):
+    """An electrode is black only if its (shank, electrode) pair is forbidden.
+
+    Shank and electrode IDs used to be matched independently, so an electrode ID
+    forbidden on one shank was also drawn black on every other shank that had
+    any forbidden electrode.
+    """
+    _select_preset(gui, probe_type)
+    selected = np.array([[0, 0], [1, 1]])
+    monkeypatch.setattr(backend, "find_selected_electrodes", lambda _imro: selected)
+    forbidden = backend.find_forbidden_electrodes(selected, pd.read_csv(gui.wiring_file))
+    forbidden_pairs = {tuple(map(int, e)) for e in forbidden} - {tuple(e) for e in selected.tolist()}
+
+    ax = _plot(gui)
+    positions = pd.read_csv(gui.positions_file).values
+    drawn_selected, drawn_forbidden = set(), set()
+    for shank_id, coll in enumerate(_electrode_collections(ax)):
+        shank_positions = positions[positions[:, 0] == shank_id]
+        colours = [_rgba(c) for c in coll.get_facecolor()]
+        assert len(colours) == len(shank_positions)
+        for (s, e, *_), colour in zip(shank_positions, colours):
+            if colour == SELECTED_RGBA:
+                drawn_selected.add((int(s), int(e)))
+            elif colour == FORBIDDEN_RGBA:
+                drawn_forbidden.add((int(s), int(e)))
+
+    assert drawn_selected == {(0, 0), (1, 1)}
+    assert drawn_forbidden == forbidden_pairs
+
+
+@pytest.mark.parametrize("probe_type", PROBE_TYPES)
+def test_no_forbidden_electrodes_does_not_crash(gui, probe_type, monkeypatch):
+    """find_forbidden_electrodes returns a 1-D empty array when nothing conflicts."""
+    _select_preset(gui, probe_type)
+    monkeypatch.setattr(backend, "find_forbidden_electrodes", lambda *_a: np.array([], dtype=int))
+
+    ax = _plot(gui)
+
+    colours = {_rgba(c) for coll in _electrode_collections(ax) for c in coll.get_facecolor()}
+    assert FORBIDDEN_RGBA not in colours
 
 
 def test_add_rects_empty_is_noop():
