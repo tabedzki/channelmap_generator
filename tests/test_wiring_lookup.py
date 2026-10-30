@@ -18,10 +18,10 @@ import pytest
 
 from pixelmap import backend
 from pixelmap.constants import (
+    WIRING_FILE_MAP,
     SUPPORTED_1shank_PRESETS,
     SUPPORTED_4shanks_PRESETS,
     SUPPORTED_QuadBase_PRESETS,
-    WIRING_FILE_MAP,
 )
 
 WIRING_DIR = Path(__file__).parent.parent / "pixelmap" / "wiring_maps"
