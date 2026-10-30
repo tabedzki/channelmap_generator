@@ -124,7 +124,7 @@ def find_forbidden_electrodes(selected_electrodes, wiring_df):
     )
     keep = ~np.isnan(row_electrodes) & ~is_self
     if not keep.any():
-        return np.array([]).astype(int)  # 1-D when empty, as callers expect
+        return np.empty((0, 2), dtype=int)
     return np.column_stack([row_shanks[keep], row_electrodes[keep]]).astype(int)
 
 def make_wiring_maps(wiring_maps_dir):
@@ -729,8 +729,6 @@ def plot_probe_layout(
     # Define forbidden electrodes from wiring map
     wiring_df = pd.read_csv(wiring_file)
     forbidden_electrodes = find_forbidden_electrodes(selected_electrodes, wiring_df)
-    # (n, 2) even when empty: find_forbidden_electrodes returns 1-D when nothing conflicts
-    forbidden_electrodes = np.asarray(forbidden_electrodes).reshape(-1, 2)
 
     # Load positions
     positions_df = pd.read_csv(positions_file)
@@ -934,7 +932,6 @@ def plot_probe_layout(
 
         for shank_id in range(n_shanks):
             shank_m = positions[:, 0] == shank_id
-            shank_m_selected = selected_electrodes[:, 0] == shank_id
             x_center = shank_id * shank_spacing
 
             # Draw shank outline with pointy tip
@@ -1008,7 +1005,7 @@ def plot_probe_layout(
             shank_positions = positions[shank_m]
             # Both lists are filtered to this shank, so matching on electrode ID
             # alone matches (shank, electrode) pairs.
-            shank_selected = selected_electrodes[shank_m_selected, 1]
+            shank_selected = selected_electrodes[selected_electrodes[:, 0] == shank_id, 1]
             shank_forbidden = forbidden_electrodes[forbidden_electrodes[:, 0] == shank_id, 1]
             is_selected = np.isin(shank_positions[:, 1], shank_selected)
             is_forbidden = np.isin(shank_positions[:, 1], shank_forbidden)
