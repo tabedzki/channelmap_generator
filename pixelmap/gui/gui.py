@@ -7,7 +7,6 @@ Using Bokeh for better interactivity with hover, click, and rectangular selectio
 import asyncio
 import base64
 import functools
-import gc
 import json
 import logging
 import re
