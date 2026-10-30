@@ -7,7 +7,6 @@ Using Bokeh for better interactivity with hover, click, and rectangular selectio
 import asyncio
 import base64
 import functools
-import gc
 import json
 import logging
 import re
@@ -1037,8 +1036,11 @@ class ChannelmapGUI(param.Parameterized):
             buffer.seek(0)
 
         finally:
+            # No gc.collect() here: a full collection walks every live object
+            # in the process and froze the shared event loop (and every other
+            # session) for seconds per download.  Closing the figure drops
+            # pyplot's reference; the regular generational GC frees the rest.
             plt.close('all')
-            gc.collect()
 
         return buffer
 
