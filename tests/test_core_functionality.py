@@ -8,15 +8,15 @@ These tests demonstrate that the software's core functionality works correctly:
 - File I/O round-trip consistency
 """
 
-from pathlib import Path
 import shutil
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from pixelmap.backend import (
-    _verify_hardware_violations,
     _load_wiring_maps,
+    _verify_hardware_violations,
     find_forbidden_electrodes,
     get_electrodes,
     make_wiring_maps,

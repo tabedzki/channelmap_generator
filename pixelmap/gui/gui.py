@@ -10,7 +10,8 @@ import json
 import logging
 import re
 import threading
-from collections.abc import Mapping, Set as AbstractSet
+from collections.abc import Mapping
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass, field
 from io import BytesIO, StringIO
 from pathlib import Path
