@@ -41,6 +41,8 @@ from bokeh.util.logconfig import basicConfig
 
 from pixelmap import __version__, backend
 from pixelmap.analytics import AnalyticsSessionTracker
+from pixelmap import error_reporting
+from pixelmap.error_reporting import guarded
 from pixelmap.constants import (
     PROBE_FEATURES,
     PROBE_TYPE_MAP,
@@ -2219,7 +2221,9 @@ class ChannelmapGUI(param.Parameterized):
             )
 
         # Python callbacks for interactions - this is the key part
-        self.electrode_source.selected.on_change("indices", self.on_electrode_selection)
+        self.electrode_source.selected.on_change(
+            "indices", guarded("electrode selection")(self.on_electrode_selection)
+        )
 
     def setup_tool_monitoring(self, select_box_string, deselect_box_string, zigzagselect_box_string, interleavedselect_box_string, dependentdeselect_box_string):
         """JS callback to expose active tools in toolbar"""
@@ -2288,7 +2292,9 @@ class ChannelmapGUI(param.Parameterized):
         self.plot.js_on_event("selectiongeometry", JS_selection_monitor)  # Selection events
         self.plot.js_on_event("tap", JS_selection_monitor)  # Plot clicks
         self.plot.js_on_event(events.MouseMove, JS_selection_monitor)  # Mouse move
-        self.tool_state_source.on_change("data", self.on_tool_state_change)
+        self.tool_state_source.on_change(
+            "data", guarded("selection tool change")(self.on_tool_state_change)
+        )
 
     def on_tool_state_change(self, attr, old, new):
         """Handle tool detection during selection"""
@@ -3212,9 +3218,25 @@ def create_app():
     # configured whichever session happened to trigger the import -- under
     # `panel serve` that is session #1, and everyone after it got
     # `pn.state.notifications is None`. Must stay inside the app factory.
-    pn.extension(*PANEL_EXTENSIONS, notifications=True)
+    # `exception_handler` is per-session for the same reason: it turns any
+    # callback error into a toast + webhook report instead of a re-raise.
+    pn.extension(
+        *PANEL_EXTENSIONS,
+        notifications=True,
+        exception_handler=error_reporting.session_exception_handler,
+    )
+    error_reporting.install_loop_handler()
 
-    gui = ChannelmapGUI()
+    try:
+        gui = ChannelmapGUI()
+    except Exception as exc:
+        # Show the visitor something instead of a blank page.
+        error_reporting.report_error(exc, context="session startup", notify_user=False)
+        return pn.pane.Alert(
+            "PixelMap failed to start. Please reload the page; if this keeps "
+            "happening, report it at https://github.com/m-beau/pixelmap/issues.",
+            alert_type="danger",
+        )
 
     cfg = _extract_cfg_from_session_args()
     if cfg:
