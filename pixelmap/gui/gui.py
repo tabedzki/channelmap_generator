@@ -329,7 +329,9 @@ class ChannelmapGUI(param.Parameterized):
         if hasattr(self, 'plot_pane'):
             del self.plot_pane
 
-        gc.collect()
+        # No gc.collect() here: this runs on the shared event loop for every
+        # closed tab, and a full collection froze all sessions for ~6 s in
+        # production.  The regular generational GC reclaims the cycles.
         print(f"🧹🧹🧹 Session {session_context.id} cleaned up")
 
 
